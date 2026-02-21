@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automação NFS-e Nacional</title>
+    <style>
+        /* =========================================================
+           TEMA "GOV.BR" - PROFISSIONAL & GLASSMORPHISM
+           SEM FONTES EXTERNAS PARA EVITAR BLOQUEIO CSP
+           ========================================================= */
+
+        :root {
+            --gov-blue: #1351B4;
+            --gov-blue-dark: #0C326F;
+            --gov-green: #138E2C;
+            --gov-green-hover: #0F6A21;
+            --gov-red: #E52207;
+            --text-main: #333333;
+            --text-muted: #555555;
+            --bg-card: rgba(255, 255, 255, 0.95);
+            --border-light: #E1E1E1;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            /* Usando fontes seguras do sistema operacional */
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            width: 420px;
+            min-height: 580px;
+            background: #EBEBEB;
+            background-image: radial-gradient(circle at 50% 0%, rgba(19, 81, 180, 0.1) 0%, transparent 70%);
+            color: var(--text-main);
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        .fake-gov-nav {
+            background: #fff;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            border-bottom: 2px solid var(--gov-blue);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            position: relative;
+            z-index: 10;
+        }
+
+        .fake-gov-nav img.logo {
+            height: 35px;
+        }
+
+        .fake-gov-nav .title {
+            margin-left: 15px;
+            font-weight: 700;
+            color: var(--gov-blue-dark);
+            font-size: 15px;
+            border-left: 1px solid #ccc;
+            padding-left: 15px;
+        }
+
+        .main-container {
+            padding: 20px;
+            position: relative;
+            z-index: 10;
+        }
+
+        #view-setup {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .card-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+            backdrop-filter: blur(10px);
+        }
+
+        .card-title {
+            font-size: 13px;
+            text-transform: uppercase;
+            color: var(--gov-blue);
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-group-2 {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            border: none;
+            border-radius: 20px;
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .btn-gov-outline {
+            background: transparent;
+            border: 1px solid var(--gov-blue);
+            color: var(--gov-blue);
+        }
+
+        .btn-gov-outline:hover {
+            background: rgba(19, 81, 180, 0.05);
+        }
+
+        .btn-gov-primary {
+            background: var(--gov-blue);
+            color: white;
+            padding: 14px;
+            font-size: 15px;
+            border-radius: 30px;
+            box-shadow: 0 4px 10px rgba(19, 81, 180, 0.3);
+        }
+
+        .btn-gov-primary:hover:not(:disabled) {
+            background: var(--gov-blue-dark);
+            transform: translateY(-1px);
+        }
+
+        .btn-gov-primary:disabled {
+            background: #A0B2C9;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .file-drop-area {
+            border: 2px dashed #B8C5D6;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .file-drop-area:hover {
+            border-color: var(--gov-blue);
+            background: #f0f4f8;
+        }
+
+        .file-drop-area input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .file-icon {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .file-text {
+            font-size: 13px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        #status-msg {
+            text-align: center;
+            font-size: 13px;
+            font-weight: 600;
+            min-height: 20px;
+        }
+
+        #view-running {
+            display: none;
+            flex-direction: column;
+            gap: 15px;
+            animation: slideInUp 0.4s ease-out;
+        }
+
+        .client-info-header {
+            background: linear-gradient(135deg, var(--gov-blue), var(--gov-blue-dark));
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 10px 20px rgba(19, 81, 180, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .client-info-header::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0) 100%);
+            animation: shine 3s infinite linear;
+            pointer-events: none;
+        }
+
+        .client-counter {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+
+        .client-name {
+            font-size: 18px;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .client-doc {
+            font-size: 13px;
+            opacity: 0.9;
+            font-family: monospace;
+            margin-top: 4px;
+        }
+
+        .global-progress-wrap {
+            background: #E1E1E1;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 15px;
+        }
+
+        .global-progress-fill {
+            background: var(--gov-green);
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .stepper {
+            display: flex;
+            justify-content: space-between;
+            position: relative;
+            margin-top: 10px;
+        }
+
+        .stepper::before {
+            content: '';
+            position: absolute;
+            top: 14px;
+            left: 10%;
+            right: 10%;
+            height: 2px;
+            background: #E1E1E1;
+            z-index: 1;
+        }
+
+        .step {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 25%;
+            gap: 8px;
+            opacity: 0.5;
+            transition: all 0.3s;
+        }
+
+        .step.active {
+            opacity: 1;
+            transform: translateY(-2px);
+        }
+
+        .step.completed {
+            opacity: 1;
+        }
+
+        .step-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            color: #999;
+            transition: all 0.3s;
+        }
+
+        .step.active .step-icon {
+            border-color: var(--gov-blue);
+            background: var(--gov-blue);
+            color: white;
+            box-shadow: 0 0 0 4px rgba(19, 81, 180, 0.2);
+        }
+
+        .step.completed .step-icon {
+            border-color: var(--gov-green);
+            background: var(--gov-green);
+            color: white;
+        }
+
+        .step-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .step.active .step-icon::after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: var(--gov-blue);
+            opacity: 0.5;
+            animation: ping 1.5s infinite;
+            z-index: -1;
+        }
+
+        .btn-stop-danger {
+            background: transparent;
+            color: var(--gov-red);
+            border: 2px solid var(--gov-red);
+            padding: 12px;
+            font-size: 14px;
+        }
+
+        .btn-stop-danger:hover {
+            background: var(--gov-red);
+            color: white;
+        }
+
+        .footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 15px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.8);
+            border-top: 1px solid var(--border-light);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .footer span {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .social-links {
+            display: flex;
+            gap: 12px;
+        }
+
+        .social-links a {
+            color: var(--gov-blue-dark);
+            opacity: 0.7;
+            transition: all 0.2s;
+            display: flex;
+        }
+
+        .social-links a:hover {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        .social-links svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes shine {
+            0% {
+                transform: translateX(-100%) rotate(45deg);
+            }
+
+            100% {
+                transform: translateX(100%) rotate(45deg);
+            }
+        }
+
+        @keyframes ping {
+            0% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="fake-gov-nav">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="var(--gov-blue)">
+            <path d="M12 2L2 12h3v8h6v-6h2v6h6v-8h3L12 2z" />
+        </svg>
+        <div class="title">AUTOMAÇÃO NFSE PRO</div>
+    </div>
+
+    <div class="main-container">
+        <div id="view-setup">
+            <div class="card-panel">
+                <div class="card-title">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path
+                            d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+                    </svg>
+                    1. Planilha de Dados
+                </div>
+                <div class="btn-group-2">
+                    <button id="btnGerador" class="btn-gov-outline">Gerar Planilha</button>
+                    <button id="btnTemplate" class="btn-gov-outline">Baixar Modelo</button>
+                </div>
+            </div>
+
+            <div class="card-panel">
+                <div class="card-title">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path
+                            d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z" />
+                    </svg>
+                    2. Importação
+                </div>
+                <div class="file-drop-area" id="drop-area">
+                    <div class="file-icon">📄</div>
+                    <div class="file-text" id="file-label">Selecione ou arraste seu CSV aqui</div>
+                    <input type="file" id="csvFile" accept=".csv">
+                </div>
+                <div id="status-msg" style="margin-top: 10px; color: var(--text-muted);">Aguardando arquivo...</div>
+            </div>
+
+            <button id="btnStart" class="btn-gov-primary" disabled>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                    <path d="M8 5v14l11-7z" />
+                </svg>
+                Iniciar Automação
+            </button>
+        </div>
+
+        <div id="view-running">
+            <div class="client-info-header">
+                <div class="client-counter" id="lbl-counter">Lote de Emissão - 0/0</div>
+                <div class="client-name" id="lbl-name" title="Nome do Cliente">Analisando...</div>
+                <div class="client-doc" id="lbl-doc">Aguardando dados...</div>
+
+                <div class="global-progress-wrap">
+                    <div class="global-progress-fill" id="global-progress"></div>
+                </div>
+            </div>
+
+            <div class="card-panel">
+                <div class="card-title" style="justify-content: center; color: var(--text-muted);">Progresso da Nota
+                    Atual</div>
+
+                <div class="stepper">
+                    <div class="step" id="step-1">
+                        <div class="step-icon">1</div>
+                        <div class="step-label">Pessoas</div>
+                    </div>
+                    <div class="step" id="step-2">
+                        <div class="step-icon">2</div>
+                        <div class="step-label">Serviço</div>
+                    </div>
+                    <div class="step" id="step-3">
+                        <div class="step-icon">3</div>
+                        <div class="step-label">Valores</div>
+                    </div>
+                    <div class="step" id="step-4">
+                        <div class="step-icon">4</div>
+                        <div class="step-label">Emissão</div>
+                    </div>
+                </div>
+            </div>
+
+            <button id="btnStop" class="btn-stop-danger">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                    <path d="M6 6h12v12H6z" />
+                </svg>
+                Parar Robô Imediatamente
+            </button>
+        </div>
+    </div>
+
+    <div class="footer">
+        <span>Desenvolvido por Jean Almeida</span>
+        <div class="social-links">
+            <a href="https://portifolio.athos.app.br" target="_blank" title="Portfólio">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+                </svg>
+            </a>
+            <a href="https://www.linkedin.com/in/jeanc-almeida" target="_blank" title="LinkedIn">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.16-3.8c-1.08 0-1.8.57-2.14 1.16v-1h-2.39v8.94h2.4v-4.88c0-.25.02-.5.1-.68.22-.49.69-1 1.5-1 .85 0 1.2.65 1.2 1.58v4.98h2.49M7.12 8.56a1.4 1.4 0 1 0 0-2.8 1.4 1.4 0 0 0 0 2.8m-1.2 9.94h2.4V9.56H5.92v8.94z" />
+                </svg>
+            </a>
+            <a href="https://github.com/JEAN-ALMEIDA-CZO" target="_blank" title="GitHub">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.45-1.16-1.1-1.47-1.1-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z" />
+                </svg>
+            </a>
+        </div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+
+</html>

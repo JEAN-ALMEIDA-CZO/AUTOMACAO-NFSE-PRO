@@ -1,0 +1,71 @@
+{
+  "manifest_version": 3,
+  "name": "Automação NFS-e PRO",
+  "version": "1.0.0",
+  "description": "Emissão automatizada e exportação em massa (XML/PDF e Relatório) do Emissor Nacional NFS-e.",
+  "permissions": [
+    "storage",
+    "scripting",
+    "activeTab",
+    "tabs",
+    "downloads"
+  ],
+  "host_permissions": [
+    "https://www.nfse.gov.br/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.nfse.gov.br/EmissorNacional/*"],
+      "js": ["bridge.js"],
+      "css": [],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://www.nfse.gov.br/EmissorNacional/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_end"
+    },
+    {
+      "matches": [
+        "https://www.nfse.gov.br/EmissorNacional/Notas/Emitidas*",
+        "https://www.nfse.gov.br/EmissorNacional/Notas/Recebidas*"
+      ],
+      "js": ["coletor.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/icon16.png",
+        "icons/icon48.png",
+        "icons/icon128.png",
+        "gerador.html",
+        "gerador.js",
+        "gerador.css"
+      ],
+      "matches": [
+        "https://www.nfse.gov.br/*",
+        "chrome-extension://*/*"
+      ]
+    }
+  ]
+}

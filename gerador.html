@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>[AUTOMAÇÃO NFSE] - Gerador de Planilha</title>
+    <link rel="stylesheet" href="gerador.css">
+</head>
+
+<body>
+    <div class="app-shell">
+
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-icon"><img src="icons/icon48.png" alt="Logo da AUTOMAÇÃO NFSE"></div>
+                <div class="brand-text">
+                    <span class="brand-title">AUTOMAÇÃO NFSE</span>
+                    <span class="brand-sub">Gerador de Planilha</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <span class="nav-section-label">Campos da Nota</span>
+                <button class="nav-item active" data-tab="pessoas">
+                    <span class="nav-icon">👤</span>
+                    <span class="nav-label">Passo 1 — Pessoas</span>
+                    <span class="nav-badge" id="badge-pessoas">0</span>
+                </button>
+                <button class="nav-item" data-tab="servico">
+                    <span class="nav-icon">🔧</span>
+                    <span class="nav-label">Passo 2 — Serviço</span>
+                    <span class="nav-badge" id="badge-servico">0</span>
+                </button>
+                <button class="nav-item" data-tab="valores">
+                    <span class="nav-icon">💰</span>
+                    <span class="nav-label">Passo 3 — Valores</span>
+                    <span class="nav-badge" id="badge-valores">0</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="queue-counter">
+                    <span class="queue-label">Itens na Fila</span>
+                    <span class="queue-number" id="total-count">0</span>
+                </div>
+                <button id="btn-add" class="btn-add">＋ Adicionar à Fila</button>
+                <button id="btn-clear-form" class="btn-ghost">Limpar Formulário</button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+
+            <header class="topbar">
+                <div>
+                    <div class="page-title" id="current-tab-title">Passo 1 — Pessoas</div>
+                    <div class="page-subtitle" id="current-tab-sub">DPS: Emitente, Tomador e Intermediário</div>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <label for="btn-import-csv" class="btn-ghost"
+                        style="margin: 0; padding: 7px 15px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <span style="font-size: 14px;">↑</span> Importar CSV
+                    </label>
+                    <input type="file" id="btn-import-csv" accept=".csv" style="display: none;">
+
+                    <button id="btn-download" class="btn-download">
+                        <span class="btn-download-icon">↓</span> Baixar Planilha
+                    </button>
+                </div>
+            </header>
+
+            <div class="form-area">
+
+                <div class="tab-panel active" id="tab-pessoas">
+
+                    <div class="field-block">
+                        <div class="block-header">
+                            <span class="block-tag">DPS</span>
+                            <span class="block-title">Declaração de Prestação de Serviço</span>
+                        </div>
+                        <div class="fields-grid">
+
+                            <div class="field-group col-full">
+                                <label>Data de Competência <span class="req">*</span></label>
+                                <div class="date-mode-wrap">
+                                    <div class="date-mode-tabs">
+                                        <button type="button" class="date-mode-btn active" data-mode="auto"
+                                            id="dmode-auto">🤖 Automático (data de execução)</button>
+                                        <button type="button" class="date-mode-btn" data-mode="manual"
+                                            id="dmode-manual">📅 Data específica</button>
+                                    </div>
+                                    <div id="date-auto-display" class="date-auto-display">
+                                        <span>✅</span> A data será preenchida automaticamente pela automação com o dia
+                                        da execução
+                                    </div>
+                                    <input type="text" id="DataCompetencia" name="DataCompetencia" style="display:none;"
+                                        placeholder="DD/MM/AAAA" value="AUTO" class="mask-data" maxlength="10">
+                                </div>
+                                <span class="field-hint">Automático = robô usa a data do dia. Manual = data fixa na
+                                    planilha.</span>
+                            </div>
+
+                            <div class="field-group">
+                                <label>Informar série e número da DPS?</label>
+                                <select id="InformarNumeroDPS" name="InformarNumeroDPS">
+                                    <option value="0">Não — gerado automaticamente</option>
+                                    <option value="1">Sim — informar manualmente</option>
+                                </select>
+                            </div>
+                            <div class="field-group dep" data-dep="InformarNumeroDPS" data-val="1"
+                                style="display:none;">
+                                <label>Série da DPS</label>
+                                <input type="number" id="DPS_Serie" name="DPS_Serie" placeholder="80000 – 89999"
+                                    maxlength="5">
+                            </div>
+                            <div class="field-group dep" data-dep="InformarNumeroDPS" data-val="1"
+                                style="display:none;">
+                                <label>Número da DPS</label>
+                                <input type="number" id="DPS_Numero" name="DPS_Numero" placeholder="Número sequencial"
+                                    maxlength="15">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field-block">
+                        <div class="block-header">
+                            <span class="block-tag">Emitente</span>
+                            <span class="block-title">Emitente da NFS-e</span>
+                            <span class="block-optional">Dados do emitente recuperados automaticamente</span>
+                        </div>
+                        <div class="fields-grid">
+                            <div class="field-group">
+                                <label>Tipo de Emitente <span class="req">*</span></label>
+                                <select id="Emitente_Tipo" name="Emitente_Tipo" disabled>
+                                    <option value="1" selected>Prestador</option>
+                                    <option value="2">Tomador</option>
+                                    <option value="3">Intermediário</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label>Regime Apuração dos Tributos no SN <span class="req">*</span></label>
+                                <select id="Emitente_SimplesNacional" name="Emitente_SimplesNacional">
+                                    <option value="">Selecione...</option>
+                                    <option value="1">Regime de apuração dos tributos federais e municipal pelo Simples
+                                        Nacional</option>
+                                    <option value="2">Regime de apuração dos tributos federais pelo Simples Nacional e o
+                                        ISSQN pela NFS-e</option>
+                                    <option value="3">Regime de apuração dos tributos federais e municipal pela NFS-e
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field-block">
+                        <div class="block-header">
+                            <span class="block-tag">Tomador</span>
+                            <span class="block-title">Tomador do Serviço</span>
+                        </div>
+                        <div class="fields-grid">
+                            <div class="field-group col-full">
+                                <label>Onde está localizado o estabelecimento/domicílio? <span
+                                        class="req">*</span></label>
+                                <div class="radio-group" id="rg-tomador-local">
+                                    <label class="radio-opt"><input type="radio" name="Tomador_LocalDomicilio" value="0"
+                                            checked> Tomador não informado</label>
+                                    <label class="radio-opt"><input type="radio" name="Tomador_LocalDomicilio"
+                                            value="1"> Brasil</label>
+                                    <label class="radio-opt"><input type="radio" name="Tomador_LocalDomicilio"
+                                            value="2"> Exterior</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="dep-section" id="sec-tomador-brasil" style="display:none; margin-top: 15px;">
+                            <div class="fields-grid">
+                                <div class="field-group">
+                                    <label>CPF / CNPJ do Tomador <span class="req">*</span></label>
+                                    <input type="text" id="Tomador_Inscricao" name="Tomador_Inscricao"
+                                        placeholder="Somente números" maxlength="18" class="mask-cpf-cnpj">
+                                </div>
+                                <div class="field-group">
+                                    <label>Indicador Municipal</label>
+                                    <input type="text" id="Tomador_IM" name="Tomador_IM" placeholder="Se houver"
+                                        maxlength="15">
+                                </div>
+                                <div class="field-group">
+                                    <label>Nome / Razão Social </label>
+                                    <input type="text" id="Tomador_Nome" name="Tomador_Nome"
+                                        placeholder="Opcional (busca auto)" maxlength="150">
+                                </div>
+                                <div class="field-group">
+                                    <label>Telefone</label>
+                                    <input type="text" id="Tomador_Telefone" name="Tomador_Telefone"
+                                        placeholder="(99) 99999-9999" maxlength="15" class="mask-telefone">
+                                </div>
+                                <div class="field-group">
+                                    <label>E-mail</label>
+                                    <input type="email" id="Tomador_Email" name="Tomador_Email"
+                                        placeholder="email@tomador.com.br" maxlength="80">
+                                </div>
+
+                                <div class="field-group col-full" style="margin-top: 10px;">
+                                    <label>Informar Endereço do Tomador?</label>
+                                    <select id="Tomador_InformarEndereco" name="Tomador_InformarEndereco">
+                                        <option value="NAO">Não</option>
+                                        <option value="SIM">Sim</option>
+                                    </select>
+                                </div>
+
+                                <div id="Tomador_EnderecoBrasil_Panel"
+                                    style="display:none; grid-column: 1 / -1; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                                    <div class="field-group">
+                                        <label>CEP <span class="req">*</span></label>
+                                        <input type="text" id="Tomador_EnderecoNacional_CEP"
+                                            name="Tomador_EnderecoNacional_CEP" placeholder="00000-000" maxlength="9"
+                                            class="mask-cep">
+                                    </div>
+                                    <div class="field-group">
+                                        <label>Município <span class="req">*</span></label>
+                                        <input type="text" id="Tomador_EnderecoNacional_Municipio"
+                                            name="Tomador_EnderecoNacional_Municipio" placeholder="Recuperado pelo CEP">
+                                    </div>
+
+                                    <div class="field-group">
+                                        <label>Bairro <span class="req">*</span></label>
+                                        <input type="text" id="Tomador_EnderecoNacional_Bairro"
+                                            name="Tomador_EnderecoNacional_Bairro" placeholder="Recuperado pelo CEP"
+                                            maxlength="60">
+                                    </div>
+                                    <div class="field-group">
+                                        <label>Logradouro <span class="req">*</span></label>
+                                        <input type="text" id="Tomador_EnderecoNacional_Logradouro"
+                                            name="Tomador_EnderecoNacional_Logradouro" placeholder="Recuperado pelo CEP"
+                                            maxlength="255">
+                                    </div>
+                                    <div class="field-group">
+                                        <label>Número <span class="req">*</span></label>
+                                        <input type="text" id="Tomador_EnderecoNacional_Numero"
+                                            name="Tomador_EnderecoNacional_Numero" maxlength="60">
+                                    </div>
+                                    <div class="field-group">
+                                        <label>Complemento</label>
+                                        <input type="text" id="Tomador_EnderecoNacional_Complemento"
+                                            name="Tomador_EnderecoNacional_Complemento" placeholder="Apto, sala…"
+                                            maxlength="156">
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="dep-section" id="sec-tomador-exterior" style="display:none; margin-top: 15px;">
+                            <div class="fields-grid">
+                                <div class="field-group col-full">
+                                    <label>O NIF será informado? <span class="req">*</span></label>
+                                    <div class="radio-group">
+                                        <label class="radio-opt"><input type="radio" name="Tomador_NIFInformado"
+                                                value="1" checked> Sim</label>
+                                        <label class="radio-opt"><input type="radio" name="Tomador_NIFInformado"
+                                                value="0"> Não</label>
+                                    </div>
+                                </div>
+                                <div class="field-group" id="Tomador_NIF_Panel">
+                                    <label>NIF <span class="req">*</span></label>
+                                    <input type="text" id="Tomador_Exterior_NIF" name="Tomador_Exterior_NIF"
+                                        placeholder="Identificação fiscal no exterior" maxlength="40">
+                                </div>
+                                <div class="field-group" id="Tomador_MotivoNaoNIF_Panel" style="display:none;">
+                                    <label>Motivo da não informação do NIF <span class="req">*</span></label>
+                                    <select id="Tomador_MotivoNaoNIF" name="Tomador_MotivoNaoNIF">
+                                        <option value="">Selecione...</option>
+                                        <option value="1">Dispensado do NIF</option>
+                                        <option value="2">Não exigência do NIF</option>
+                                    </select>
+                                </div>
+                                <div class="field-group">
+                                    <label>Nome / Razão Social <span class="req">*</span></label>
+                                    <input type="text" id="Tomador_Exterior_Nome" name="Tomador_Exterior_Nome"
+                                        maxlength="150">
+                                </div>
+                                <div class="field-group">
+                                    <label>País (Sigla) <span class="req">*</span></label>
+                                    <input type="text" id="Tomador_Exterior_Pais" name="Tomador_Exterior_Pais"
+                                        placeholder="Ex: US, AR, PT">
+                                </div>
+                                <div class="field-group">
+                                    <label>Código Postal <span class="req">*</span></label>
+                                    <input type="text" id="Tomador_Exterior_CodigoPostal"
+                                        name="Tomador_Exterior_CodigoPostal" maxlength="11">
+                                </div>
+                                <div class="field-group">
+                                    <label>Estado / Província / Região <span class="req">*</span></label>
+                                    <input type="text" id="Tomador_Exterior_Estado" name="Tomador_Exterior_Estado">
+                                </div>
+                                <div class="field-group">
+                                    <label>Cidade <span class="req">*</span></label>
+                                    <input type="text" id="Tomador_Exterior_Cidade" name="Tomador_Exterior_Cidade"
+                                        maxlength="255">
+                                </div>
+                                <div class="field-group">
+                                    <label>Bairro <span class="req">*</span></label>
+                                    <input type="text" id="Tomador_Exterior_Bairro" name="Tomador_Exterior_Bairro"
+                                        maxlength="255">
+                                </div>
+                                <div class="field-group">
+                                    <label>Logradouro <span class="req">*</span></label>
+                                    <input type="text" id="Tomador_Exterior_Logradouro"
+                                        name="Tomador_Exterior_Logradouro" maxlength="255">
+                                </div>
+                                <div class="field-group">
+                                    <label>Número <span class="req">*</span></label>
+                                    <input type="text" id="Tomador_Exterior_Numero" name="Tomador_Exterior_Numero"
+                                        maxlength="255">
+                                </div>
+                                <div class="field-group">
+                                    <label>Complemento</label>
+                                    <input type="text" id="Tomador_Exterior_Complemento"
+                                        name="Tomador_Exterior_Complemento" maxlength="255">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field-block">
+                        <div class="block-header">
+                            <span class="block-tag">Intermediário</span>
+                            <span class="block-title">Intermediário do Serviço</span>
+                            <span class="block-optional">Opcional</span>
+                        </div>
+                        <div class="fields-grid">
+                            <div class="field-group col-full">
+                                <label>Localização do Intermediário</label>
+                                <div class="radio-group" id="rg-inter-local">
+                                    <label class="radio-opt"><input type="radio" name="Intermediario_LocalDomicilio"
+                                            value="0" checked> Não informado</label>
+                                    <label class="radio-opt"><input type="radio" name="Intermediario_LocalDomicilio"
+                                            value="1"> Brasil</label>
+                                    <label class="radio-opt"><input type="radio" name="Intermediario_LocalDomicilio"
+                                            value="2"> Exterior</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="dep-section" id="sec-inter-brasil" style="display:none; margin-top: 15px;">
+                            <div class="fields-grid">
+                                <div class="field-group">
+                                    <label>CPF / CNPJ <span class="req">*</span></label>
+                                    <input type="text" id="Intermediario_Inscricao" name="Intermediario_Inscricao"
+                                        maxlength="18" class="mask-cpf-cnpj">
+                                </div>
+                                <div class="field-group">
+                                    <label>Inscrição Municipal</label>
+                                    <input type="text" id="Intermediario_IM" name="Intermediario_IM" maxlength="15">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="dep-section" id="sec-inter-exterior" style="display:none; margin-top: 15px;">
+                            <div class="fields-grid">
+                                <div class="field-group col-full">
+                                    <label>O NIF será informado? <span class="req">*</span></label>
+                                    <div class="radio-group">
+                                        <label class="radio-opt"><input type="radio" name="Intermediario_NIFInformado"
+                                                value="1" checked> Sim</label>
+                                        <label class="radio-opt"><input type="radio" name="Intermediario_NIFInformado"
+                                                value="0"> Não</label>
+                                    </div>
+                                </div>
+                                <div class="field-group" id="Intermediario_NIF_Panel">
+                                    <label>NIF <span class="req">*</span></label>
+                                    <input type="text" id="Intermediario_Exterior_NIF" name="Intermediario_Exterior_NIF"
+                                        maxlength="40">
+                                </div>
+                                <div class="field-group" id="Intermediario_MotivoNaoNIF_Panel" style="display:none;">
+                                    <label>Motivo da não informação do NIF <span class="req">*</span></label>
+                                    <select id="Intermediario_MotivoNaoNIF" name="Intermediario_MotivoNaoNIF">
+                                        <option value="">Selecione...</option>
+                                        <option value="1">Dispensado do NIF</option>
+                                        <option value="2">Não exigência do NIF</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="dep-section" id="sec-inter-comum" style="display:none; margin-top: 15px;">
+                            <div class="fields-grid">
+                                <div class="field-group col-full">
+                                    <label>Nome / Razão Social <span class="req">*</span></label>
+                                    <input type="text" id="Intermediario_Nome" name="Intermediario_Nome"
+                                        maxlength="150">
+                                </div>
+                                <div class="field-group">
+                                    <label>Telefone</label>
+                                    <input type="text" id="Intermediario_Telefone" name="Intermediario_Telefone"
+                                        maxlength="15" class="mask-telefone">
+                                </div>
+                                <div class="field-group">
+                                    <label>E-mail</label>
+                                    <input type="email" id="Intermediario_Email" name="Intermediario_Email"
+                                        maxlength="80">
+                                </div>
+                                <div class="field-group col-full" style="margin-top: 10px;">
+                                    <label>Informar Endereço do Intermediário?</label>
+                                    <select id="Intermediario_InformarEndereco" name="Intermediario_InformarEndereco">
+                                        <option value="NAO">Não</option>
+                                        <option value="SIM">Sim</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="dep-section" id="sec-inter-end-brasil" style="display:none; margin-top: 15px;">
+                            <div class="fields-grid">
+                                <div class="field-group">
+                                    <label>CEP <span class="req">*</span></label>
+                                    <input type="text" id="Intermediario_EnderecoNacional_CEP"
+                                        name="Intermediario_EnderecoNacional_CEP" maxlength="9" class="mask-cep">
+                                </div>
+                                <div class="field-group">
+                                    <label>Município</label>
+                                    <input type="text" id="Intermediario_EnderecoNacional_Municipio"
+                                        name="Intermediario_EnderecoNacional_Municipio"
+                                        placeholder="Recuperado pelo CEP">
+                                </div>
+                                <div class="field-group">
+                                    <label>Bairro <span class="req">*</span></label>
+                                    <input type="text" id="Intermediario_EnderecoNacional_Bairro"
+                                        name="Intermediario_EnderecoNacional_Bairro" maxlength="60">
+                                </div>
+                                <div class="field-group">
+                                    <label>Logradouro <span class="req">*</span></label>
+                                    <input type="text" id="Intermediario_EnderecoNacional_Logradouro"
+                                        name="Intermediario_EnderecoNacional_Logradouro" maxlength="255">
+                                </div>
+                                <div class="field-group">
+                                    <label>Número <span class="req">*</span></label>
+                                    <input type="text" id="Intermediario_EnderecoNacional_Numero"
+                                        name="Intermediario_EnderecoNacional_Numero" maxlength="60">
+                                </div>
+                                <div class="field-group">
+                                    <label>Complemento</label>
+                                    <input type="text" id="Intermediario_EnderecoNacional_Complemento"
+                                        name="Intermediario_EnderecoNacional_Complemento" maxlength="156">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="dep-section" id="sec-inter-end-exterior" style="display:none; margin-top: 15px;">
+                            <div class="fields-grid">
+                                <div class="field-group">
+                                    <label>País (Sigla) <span class="req">*</span></label>
+                                    <input type="text" id="Intermediario_Exterior_Pais"
+                                        name="Intermediario_Exterior_Pais" placeholder="Ex: US, AR, PT">
+                                </div>
+                                <div class="field-group">
+                                    <label>Código Postal <span class="req">*</span></label>
+                                    <input type="text" id="Intermediario_Exterior_CodigoPostal"
+                                        name="Intermediario_Exterior_CodigoPostal" maxlength="11">
+                                </div>
+                                <div class="field-group">
+                                    <label>Estado / Província / Região <span class="req">*</span></label>
+                                    <input type="text" id="Intermediario_Exterior_Estado"
+                                        name="Intermediario_Exterior_Estado">
+                                </div>
+                                <div class="field-group">
+                                    <label>Cidade <span class="req">*</span></label>
+                                    <input type="text" id="Intermediario_Exterior_Cidade"
+                                        name="Intermediario_Exterior_Cidade" maxlength="255">
+                                </div>
+                                <div class="field-group">
+                                    <label>Bairro <span class="req">*</span></label>
+                                    <input type="text" id="Intermediario_Exterior_Bairro"
+                                        name="Intermediario_Exterior_Bairro" maxlength="255">
+                                </div>
+                                <div class="field-group">
+                                    <label>Logradouro <span class="req">*</span></label>
+                                    <input type="text" id="Intermediario_Exterior_Logradouro"
+                                        name="Intermediario_Exterior_Logradouro" maxlength="255">
+                                </div>
+                                <div class="field-group">
+                                    <label>Número <span class="req">*</span></label>
+                                    <input type="text" id="Intermediario_Exterior_Numero"
+                                        name="Intermediario_Exterior_Numero" maxlength="255">
+                                </div>
+                                <div class="field-group">
+                                    <label>Complemento</label>
+                                    <input type="text" id="Intermediario_Exterior_Complemento"
+                                        name="Intermediario_Exterior_Complemento" maxlength="255">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="tab-panel" id="tab-servico">
+
+                    <div class="field-block">
+                        <div class="block-header">
+                            <span class="block-tag">Local</span>
+                            <span class="block-title">Local da Prestação</span>
+                        </div>
+                        <div class="fields-grid">
+                            <div class="field-group">
+                                <label>País da Prestação <span class="req">*</span></label>
+                                <input type="text" id="LocalPrestacao_Pais" name="LocalPrestacao_Pais" value="Brasil"
+                                    placeholder="Sigla (Ex: Brasil)">
+                            </div>
+                            <div class="field-group">
+                                <label>Município <span class="req">*</span></label>
+                                <input type="text" id="LocalPrestacao_Municipio" name="LocalPrestacao_Municipio"
+                                    placeholder="Ex: Itapema">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field-block">
+                        <div class="block-header">
+                            <span class="block-tag">Código</span>
+                            <span class="block-title">Código de Tributação Nacional e Municipal</span>
+                        </div>
+                        <div class="fields-grid">
+                            <div class="field-group col-full">
+                                <label>Código de Tributação Nacional<span class="req">*</span></label>
+                                <input type="text" id="ServicoPrestado_CodigoTributacaoNacional"
+                                    name="ServicoPrestado_CodigoTributacaoNacional" placeholder="Ex: 17.02.01">
+                                <span class="field-hint">Padrão LC 116/2003</span>
+                            </div>
+                            <div class="field-group col-full">
+                                <label>Código Complementar Municipal</label>
+                                <input type="text" id="ServicoPrestado_CodigoComplementarMunicipal"
+                                    name="ServicoPrestado_CodigoComplementarMunicipal"
+                                    placeholder="Se exigido pelo município">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field-block">
+                        <div class="block-header">
+                            <span class="block-tag">Discriminação</span>
+                            <span class="block-title">Descrição e Informações do Serviço</span>
+                        </div>
+
+                        <div class="fields-grid">
+                            <div class="field-group col-full" style="margin-top: 15px;">
+                                <label>O serviço é caso de: imunidade, exportação ou não incidência?</label>
+                                <div class="radio-group">
+                                    <label class="radio-opt"><input type="radio" name="Servico_ImunidadeExportacao"
+                                            value="0" checked> Não</label>
+                                    <label class="radio-opt"><input type="radio" name="Servico_ImunidadeExportacao"
+                                            value="1"> Sim</label>
+                                </div>
+                            </div>
+
+                            <div id="Panel_ImunidadeExportacao"
+                                style="display:none; grid-column: 1 / -1; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px;">
+                                <div class="field-group col-full">
+                                    <label>Motivo da não tributação <span class="req">*</span></label>
+                                    <select id="Servico_MotivoNaoTributacao" name="Servico_MotivoNaoTributacao">
+                                        <option value="">Selecione...</option>
+                                        <option value="2">Imunidade</option>
+                                        <option value="3">Exportação de Serviço</option>
+                                        <option value="4">Não incidência</option>
+                                    </select>
+                                </div>
+                                <div class="field-group col-full" id="Panel_TipoImunidade" style="display:none;">
+                                    <label>Tipo de Imunidade <span class="req">*</span></label>
+                                    <select id="Servico_TipoImunidade" name="Servico_TipoImunidade">
+                                        <option value="">Selecione...</option>
+                                        <option value="1">Patrimônio, renda ou serviços (CF88, Art 150, VI, "a")
+                                        </option>
+                                        <option value="2">Templos de qualquer culto (CF88, Art 150, VI, "b")</option>
+                                        <option value="3">Partidos políticos, educação, ass. social (CF88, Art 150, VI,
+                                            "c")</option>
+                                        <option value="4">Livros, jornais, periódicos (CF88, Art 150, VI, "d")</option>
+                                        <option value="5">Fonogramas e videofonogramas musicais (CF88, Art 150, VI, "e")
+                                        </option>
+                                    </select>
+                                </div>
+                                <div class="field-group col-full" id="Panel_PaisResultado" style="display:none;">
+                                    <label>País em que se verificou o resultado <span class="req">*</span></label>
+                                    <input type="text" id="Servico_PaisResultado" name="Servico_PaisResultado"
+                                        placeholder="Sigla do País (Ex: US, PT, AR)">
+                                </div>
+                            </div>
+                            <div class="field-group col-full">
+                                <label>Descrição do Serviço <span class="req">*</span></label>
+                                <textarea id="ServicoPrestado_Descricao" name="ServicoPrestado_Descricao"
+                                    placeholder="Descreva o serviço detalhadamente..." rows="4"
+                                    maxlength="2000"></textarea>
+                            </div>
+                            <div class="field-group col-full">
+                                <label>Item da NBS correspondente ao serviço prestado</label>
+                                <input type="text" id="ServicoPrestado_CodigoNBS" name="ServicoPrestado_CodigoNBS"
+                                    placeholder="Ex: 101011100">
+                            </div>
+
+
+                        </div>
+                    </div>
+
+                    <div class="field-block">
+                        <div class="block-header">
+                            <span class="block-tag">Obra</span>
+                            <span class="block-title">Informações de Obra</span>
+                        </div>
+                        <div class="fields-grid">
+                            <div class="field-group col-full">
+                                <label>Preencher informações para Obra?</label>
+                                <select id="InformarDadosObra" name="InformarDadosObra">
+                                    <option value="NAO">Não</option>
+                                    <option value="SIM">Sim</option>
+                                </select>
+                            </div>
+
+                            <div id="Panel_DadosObra"
+                                style="display:none; grid-column: 1 / -1; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="field-group col-full">
+                                    <label>Selecione uma das opções abaixo: <span class="req">*</span></label>
+                                    <div class="radio-group" style="flex-direction: column;">
+                                        <label class="radio-opt"><input type="radio" name="Obra_TipoInformacao"
+                                                value="1" checked> Código de Obra</label>
+                                        <label class="radio-opt"><input type="radio" name="Obra_TipoInformacao"
+                                                value="5"> Código do Cadastro Imobiliário Brasileiro - CIB</label>
+                                        <label class="radio-opt"><input type="radio" name="Obra_TipoInformacao"
+                                                value="3"> Endereço no Brasil</label>
+                                        <label class="radio-opt"><input type="radio" name="Obra_TipoInformacao"
+                                                value="4"> Endereço no Exterior</label>
+                                    </div>
+                                </div>
+
+                                <div class="field-group col-full" id="pnlObraCodigoBase">
+                                    <label>Código da Obra / CIB</label>
+                                    <input type="text" id="Obra_Codigo" name="Obra_Codigo" maxlength="30"
+                                        placeholder="Informe o código">
+                                </div>
+
+                                <div class="field-group col-full" id="pnlObraEnderecos" style="display:none;">
+                                    <label>CEP / Código Postal (Obra) <span class="req">*</span></label>
+                                    <input type="text" id="Obra_CEP" name="Obra_CEP" maxlength="9" class="mask-cep">
+
+                                    <label style="margin-top: 10px;">Cidade / Município (Obra) <span
+                                            class="req">*</span></label>
+                                    <input type="text" id="Obra_Cidade" name="Obra_Cidade" maxlength="60">
+
+                                    <label style="margin-top: 10px;">Bairro (Obra) <span class="req">*</span></label>
+                                    <input type="text" id="Obra_Bairro" name="Obra_Bairro" maxlength="60">
+
+                                    <label style="margin-top: 10px;">Logradouro (Obra) <span
+                                            class="req">*</span></label>
+                                    <input type="text" id="Obra_Logradouro" name="Obra_Logradouro" maxlength="255">
+
+                                    <label style="margin-top: 10px;">Número (Obra) <span class="req">*</span></label>
+                                    <input type="text" id="Obra_Numero" name="Obra_Numero" maxlength="60">
+
+                                    <label style="margin-top: 10px;">Complemento (Obra)</label>
+                                    <input type="text" id="Obra_Complemento" name="Obra_Complemento" maxlength="156">
+                                </div>
+
+                                <div class="field-group col-full" style="margin-top: 10px;">
+                                    <label>Inscrição Imobiliária Fiscal</label> <i class="field-hint">A Inscrição
+                                        Imobiliária Fiscal é o código fornecido pela prefeitura para a identificação da
+                                        obra ou para fins de recolhimento do IPTU</i>
+                                    <input type="text" id="Obra_InscricaoImobiliaria" name="Obra_InscricaoImobiliaria"
+                                        maxlength="30">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field-block">
+                        <div class="block-header">
+                            <span class="block-tag">Evento</span>
+                            <span class="block-title">Informações para Atividade de Evento</span>
+                        </div>
+                        <div class="fields-grid">
+                            <div class="field-group col-full">
+                                <label>Preencher informações para Evento?</label>
+                                <select id="InformarDadosEvento" name="InformarDadosEvento">
+                                    <option value="NAO">Não</option>
+                                    <option value="SIM">Sim</option>
+                                </select>
+                            </div>
+
+                            <div id="Panel_DadosEvento"
+                                style="display:none; grid-column: 1 / -1; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="field-group">
+                                    <label>Data Inicial <span class="req">*</span></label>
+                                    <input type="text" id="Evento_DataInicial" name="Evento_DataInicial"
+                                        placeholder="DD/MM/AAAA" class="mask-data" maxlength="10">
+                                </div>
+                                <div class="field-group">
+                                    <label>Data Final <span class="req">*</span></label>
+                                    <input type="text" id="Evento_DataFinal" name="Evento_DataFinal"
+                                        placeholder="DD/MM/AAAA" class="mask-data" maxlength="10">
+                                </div>
+                                <div class="field-group col-full">
+                                    <label>Descrição do Evento <span class="req">*</span></label>
+                                    <textarea id="Evento_Descricao" name="Evento_Descricao" rows="2"
+                                        maxlength="255"></textarea>
+                                </div>
+
+                                <div class="field-group col-full">
+                                    <label>Selecione o tipo de identificação: <span class="req">*</span></label>
+                                    <div class="radio-group" style="flex-direction: column;">
+                                        <label class="radio-opt"><input type="radio" name="Evento_TipoInformacao"
+                                                value="1" checked> Identificador</label>
+                                        <label class="radio-opt"><input type="radio" name="Evento_TipoInformacao"
+                                                value="3"> Endereço no Brasil</label>
+                                        <label class="radio-opt"><input type="radio" name="Evento_TipoInformacao"
+                                                value="4"> Endereço no Exterior</label>
+                                    </div>
+                                </div>
+
+                                <div class="field-group col-full" id="pnlEventoIdentificadorBase">
+                                    <label>Identificação</label>
+                                    <input type="text" id="Evento_Identificacao" name="Evento_Identificacao"
+                                        maxlength="30">
+                                </div>
+
+                                <div class="field-group col-full" id="pnlEventoEnderecos" style="display:none;">
+                                    <label>CEP / Código Postal (Evento)</label>
+                                    <input type="text" id="Evento_CEP" name="Evento_CEP" maxlength="9" class="mask-cep">
+
+                                    <label style="margin-top: 10px;">Cidade / Município (Evento)</label>
+                                    <input type="text" id="Evento_Cidade" name="Evento_Cidade" maxlength="60">
+
+                                    <label style="margin-top: 10px;">Bairro (Evento)</label>
+                                    <input type="text" id="Evento_Bairro" name="Evento_Bairro" maxlength="60">
+
+                                    <label style="margin-top: 10px;">Logradouro (Evento)</label>
+                                    <input type="text" id="Evento_Logradouro" name="Evento_Logradouro" maxlength="255">
+
+                                    <label style="margin-top: 10px;">Número (Evento)</label>
+                                    <input type="text" id="Evento_Numero" name="Evento_Numero" maxlength="60">
+
+                                    <label style="margin-top: 10px;">Complemento (Evento)</label>
+                                    <input type="text" id="Evento_Complemento" name="Evento_Complemento"
+                                        maxlength="156">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field-block">
+                        <div class="block-header">
+                            <span class="block-tag">COMEX</span>
+                            <span class="block-title">Comércio Exterior</span>
+                        </div>
+                        <div class="fields-grid">
+                            <div class="field-group col-full">
+                                <label>Preencher informações de Comércio Exterior?</label>
+                                <select id="InformarComercioExterior" name="InformarComercioExterior">
+                                    <option value="NAO">Não</option>
+                                    <option value="SIM">Sim</option>
+                                </select>
+                            </div>
+
+                            <div id="Panel_ComercioExterior"
+                                style="display:none; grid-column: 1 / -1; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="field-group">
+                                    <label>Modo de Prestação <span class="req">*</span></label>
+                                    <select id="ComercioExterior_ModoPrestacao" name="ComercioExterior_ModoPrestacao">
+                                        <option value="">Selecione...</option>
+                                        <option value="1">Transfronteiriço</option>
+                                        <option value="2">Consumo no Brasil</option>
+                                        <option value="3">Movimento Temp. Pessoas Físicas</option>
+                                        <option value="4">Consumo no Exterior</option>
+                                    </select>
+                                </div>
+                                <div class="field-group">
+                                    <label>Vínculo (Negócio) <span class="req">*</span></label>
+                                    <select id="ComercioExterior_VinculoPrestacao"
+                                        name="ComercioExterior_VinculoPrestacao">
+                                        <option value="">Selecione...</option>
+                                        <option value="0">Sem vínculo</option>
+                                        <option value="1">Controlada</option>
+                                        <option value="2">Controladora</option>
+                                        <option value="3">Coligada</option>
+                                        <option value="4">Matriz</option>
+                                        <option value="5">Filial/Sucursal</option>
+                                        <option value="6">Outro vínculo</option>
+                                        <option value="9">Desconhecido</option>
+                                    </select>
+                                </div>
+                                <div class="field-group">
+                                    <label>Moeda (3 dígitos) <span class="req">*</span></label>
+                                    <input type="text" id="ComercioExterior_TipoMoeda" name="ComercioExterior_TipoMoeda"
+                                        maxlength="3" placeholder="Ex: USD, EUR">
+                                </div>
+                                <div class="field-group">
+                                    <label>Valor (Moeda Estrangeira) <span class="req">*</span></label>
+                                    <input type="text" id="ComercioExterior_ValorServico"
+                                        name="ComercioExterior_ValorServico" class="monetario">
+                                </div>
+                                <div class="field-group col-full">
+                                    <label>Mecanismo Apoio (Prestador) <span class="req">*</span></label>
+                                    <select id="ComercioExterior_MecanismoApoioPrestador"
+                                        name="ComercioExterior_MecanismoApoioPrestador">
+                                        <option value="1">Nenhum</option>
+                                        <option value="2">ACC</option>
+                                        <option value="3">ACE</option>
+                                        <option value="4">BNDES-Exim Pós-Embarque</option>
+                                        <option value="5">BNDES-Exim Pré-Embarque</option>
+                                        <option value="6">FGE</option>
+                                        <option value="7">PROEX - Equalização</option>
+                                        <option value="8">PROEX - Financiamento</option>
+                                    </select>
+                                </div>
+                                <div class="field-group col-full">
+                                    <label>Mecanismo Apoio (Tomador) <span class="req">*</span></label>
+                                    <input type="text" id="ComercioExterior_MecanismoApoioTomador"
+                                        name="ComercioExterior_MecanismoApoioTomador"
+                                        placeholder="Código (Ex: 1 para Nenhum)">
+                                </div>
+                                <div class="field-group col-full">
+                                    <label>Vinculo à movimentação temporária de bens? <span class="req">*</span></label>
+                                    <select id="ComercioExterior_MovimentacaoTempBens"
+                                        name="ComercioExterior_MovimentacaoTempBens">
+                                        <option value="1">Não</option>
+                                        <option value="2">Vinculada - Declaração Importação (DI)</option>
+                                        <option value="3">Vinculada - Declaração Exportação (RE)</option>
+                                    </select>
+                                </div>
+                                <div class="field-group col-full" id="pnlComexREDI" style="display:none;">
+                                    <label>Número do RE / DI Averbado <span class="req">*</span></label>
+                                    <input type="text" id="ComercioExterior_NumeroREDI"
+                                        name="ComercioExterior_NumeroREDI" maxlength="12">
+                                </div>
+                                <div class="field-group col-full">
+                                    <label>Compartilhar NFS-e com o MDIC? <span class="req">*</span></label>
+                                    <div class="radio-group">
+                                        <label class="radio-opt"><input type="radio"
+                                                name="ComercioExterior_CompartilharMDIC" value="0" checked> Não</label>
+                                        <label class="radio-opt"><input type="radio"
+                                                name="ComercioExterior_CompartilharMDIC" value="1"> Sim</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field-block">
+                        <div class="block-header">
+                            <span class="block-tag">Complementos</span>
+                            <span class="block-title">Informações Complementares e Responsabilidade</span>
+                        </div>
+                        <div class="fields-grid">
+                            <div class="field-group col-full">
+                                <label>Número do documento de responsabilidade técnica (ART/RRT)</label>
+                                <input type="text" id="Complemento_NumeroRespTecnica"
+                                    name="Complemento_NumeroRespTecnica" maxlength="40">
+                            </div>
+                            <div class="field-group col-full">
+                                <label>Documento de referência</label>
+                                <textarea id="Complemento_DocumentoReferencia" name="Complemento_DocumentoReferencia"
+                                    rows="2" maxlength="255"></textarea>
+                            </div>
+                            <div class="field-group col-full">
+                                <label>Informações complementares</label>
+                                <textarea id="Complemento_Informacoes" name="Complemento_Informacoes" rows="3"
+                                    maxlength="2000"></textarea>
+                            </div>
+                            <div class="field-group col-full">
+                                <label>Número do Pedido, Ordem de Compra, Ordem de Serviço ou Projeto que autorize a
+                                    prestação do serviço em operações B2B</label>
+                                <input type="text" id="Complemento_Pedido" name="Complemento_Pedido" maxlength="60">
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="tab-panel" id="tab-valores">
+
+                    <div class="field-block">
+                        <div class="block-header">
+                            <span class="block-tag">Serviço</span>
+                            <span class="block-title">Valores Básicos</span>
+                        </div>
+                        <div class="fields-grid">
+                            <div class="field-group">
+                                <label>Valor do Serviço Prestado <span class="req">*</span></label>
+                                <input type="text" id="Valores_ValorServico" name="Valores_ValorServico"
+                                    class="monetario" placeholder="Ex: 1000,00">
+                            </div>
+                            <div class="field-group">
+                                <label>Desconto Incondicionado</label>
+                                <input type="text" id="Valores_DescontoIncondicionado"
+                                    name="Valores_DescontoIncondicionado" class="monetario" placeholder="0,00">
+                            </div>
+                            <div class="field-group">
+                                <label>Desconto Condicionado</label>
+                                <input type="text" id="Valores_DescontoCondicionado" name="Valores_DescontoCondicionado"
+                                    class="monetario" placeholder="0,00">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field-block">
+                        <div class="block-header">
+                            <span class="block-tag">ISSQN</span>
+                            <span class="block-title">Tributação Municipal e Benefícios</span>
+                        </div>
+                        <div class="fields-grid">
+                            <div class="field-group col-full">
+                                <label>Há retenção do ISSQN pelo Tomador ou pelo Intermediário? <span
+                                        class="req">*</span></label>
+                                <div class="radio-group">
+                                    <label class="radio-opt"><input type="radio" name="ISSQN_Retido" value="0" checked>
+                                        Não</label>
+                                    <label class="radio-opt"><input type="radio" name="ISSQN_Retido" value="1">
+                                        Sim</label>
+                                </div>
+                            </div>
+
+                            <div class="field-group" id="Panel_ISSQN_TipoRetencao"
+                                style="display:none; flex-direction: column;">
+                                <label>Por quem o imposto será retido?</label>
+                                <div class="radio-group">
+                                    <label class="radio-opt"><input type="radio" name="ISSQN_TipoRetencao" value="2"
+                                            checked> Tomador</label>
+                                    <label class="radio-opt"><input type="radio" name="ISSQN_TipoRetencao" value="3">
+                                        Intermediário</label>
+                                </div>
+                                <i class="field-hint">Para o prestador de serviço ME/EPP com apuração do ISSQN pelo
+                                    simples nacional, é obrigatório informar alíquota quando há indicação de retenção do
+                                    ISSQN. Neste caso é permitido informar alíquota mínima de 1,8%.</i>
+                                <span id="hint-retencao-cpf" class="field-hint"
+                                    style="color: var(--danger); display: none; margin-top: 6px; font-weight: 600;">⚠️
+                                    Retenção pelo Tomador é permitida apenas para CNPJ.</span>
+                            </div>
+
+                            <div class="field-group">
+                                <label>Alíquota ISSQN (%)</label>
+                                <input type="text" id="ISSQN_Aliquota" name="ISSQN_Aliquota" class="percentual"
+                                    placeholder="Ex: 2,00">
+                                <span class="field-hint">Obrigatório p/ optantes SN com retenção</span>
+                            </div>
+
+                            <div class="field-group col-full"
+                                style="margin-top: 15px; border-top: 1px dashed var(--border); padding-top: 15px;">
+                                <label>Este serviço prestado está amparado por algum benefício municipal? <span
+                                        class="req">*</span></label>
+                                <div class="radio-group">
+                                    <label class="radio-opt"><input type="radio" name="ISSQN_HaBeneficioMunicipal"
+                                            value="0" checked> Não</label>
+                                    <label class="radio-opt"><input type="radio" name="ISSQN_HaBeneficioMunicipal"
+                                            value="1"> Sim</label>
+                                </div>
+                            </div>
+                            <div class="field-group col-full" id="Panel_BeneficioMunicipal" style="display:none;">
+                                <label>Identificação do Benefício Municipal (ID) <span class="req">*</span></label>
+                                <input type="text" id="ISSQN_BeneficioMunicipal" name="ISSQN_BeneficioMunicipal"
+                                    placeholder="Deixe em branco se não houver">
+                            </div>
+
+                            <div class="field-group col-full"
+                                style="margin-top: 15px; border-top: 1px dashed var(--border); padding-top: 15px;">
+                                <label>Será aplicado algum tipo de Dedução/Redução à base de cálculo do ISSQN? <span
+                                        class="req">*</span></label>
+                                <div class="radio-group">
+                                    <label class="radio-opt"><input type="radio" name="ISSQN_HaDeducaoReducao" value="0"
+                                            checked> Não</label>
+                                    <label class="radio-opt"><input type="radio" name="ISSQN_HaDeducaoReducao"
+                                            value="1"> Sim</label>
+                                </div>
+                            </div>
+                            <i class="field-hint" style="margin-top: 6px;">Na data de competência informada, o município
+                                de incidência definido para esta NFS-e não permite nenhum tipo de redução da base de
+                                cálculo do ISSQN.</i>
+                            <div id="Panel_DeducaoReducao"
+                                style="display:none; grid-column: 1 / -1; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="field-group col-full">
+                                    <label>Tipo de Dedução/Redução <span class="req">*</span></label>
+                                    <div class="radio-group">
+                                        <label class="radio-opt"><input type="radio" name="DeducaoReducao_Tipo"
+                                                value="1" checked> Valor monetário</label>
+                                        <label class="radio-opt"><input type="radio" name="DeducaoReducao_Tipo"
+                                                value="2"> Valor percentual</label>
+                                    </div>
+                                </div>
+                                <div class="field-group col-full" id="Panel_DeducaoValor">
+                                    <label>Valor Monetário para redução (R$)</label>
+                                    <input type="text" id="DeducaoReducao_ValorMonetario"
+                                        name="DeducaoReducao_ValorMonetario" class="monetario" placeholder="0,00">
+                                </div>
+                                <div class="field-group col-full" id="Panel_DeducaoPercentual" style="display:none;">
+                                    <label>Valor Percentual para redução (%)</label>
+                                    <input type="text" id="DeducaoReducao_ValorPercentual"
+                                        name="DeducaoReducao_ValorPercentual" class="percentual" placeholder="0,00">
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div class="field-block">
+                        <div class="block-header">
+                            <span class="block-tag">Federal</span>
+                            <span class="block-title">Tributação Federal (PIS/COFINS/CSLL/IRRF/CP)</span>
+                        </div>
+                        <div class="fields-grid">
+                            <div class="field-group col-full">
+                                <label>Situação Tributária do PIS/COFINS <span class="req">*</span></label>
+                                <select id="TribFed_SituacaoTributaria" name="TribFed_SituacaoTributaria">
+                                    <option value="">Selecione...</option>
+                                    <option value="00">00 - Nenhum</option>
+                                    <option value="01">01 - Operação Tributável com Alíquota Básica</option>
+                                    <option value="02">02 - Operação Tributável com Alíquota Diferenciada</option>
+                                    <option value="03">03 - Operação Tributável com Alíquota por Unidade de Medida de
+                                        Produto</option>
+                                    <option value="04">04 - Operação Tributável monofásica - Revenda a Alíquota Zero
+                                    </option>
+                                    <option value="05">05 - Operação Tributável por Substituição Tributária</option>
+                                    <option value="06">06 - Operação Tributável a Alíquota Zero</option>
+                                    <option value="07">07 - Operação Isenta da Contribuição</option>
+                                    <option value="08">08 - Operação sem Incidência da Contribuição</option>
+                                    <option value="09">09 - Operação com Suspensão da Contribuição</option>
+                                    <option value="49">49 - Outras Operações de Saída</option>
+                                    <option value="50">50 - Operação com Direito a Crédito – Vinculada Exclusivamente a
+                                        Receita Tributada no Mercado Interno</option>
+                                    <option value="51">51 - Operação com Direito a Crédito – Vinculada Exclusivamente a
+                                        Receita Não-Tributada no Mercado Interno</option>
+                                    <option value="52">52 - Operação com Direito a Crédito – Vinculada Exclusivamente a
+                                        Receita de Exportação</option>
+                                    <option value="53">53 - Operação com Direito a Crédito – Vinculada a Receitas
+                                        Tributadas e Não-Tributadas no Mercado Interno</option>
+                                    <option value="54">54 - Operação com Direito a Crédito – Vinculada a Receitas
+                                        Tributadas no Mercado Interno e de Exportação</option>
+                                    <option value="55">55 - Operação com Direito a Crédito – Vinculada a Receitas Não
+                                        Tributadas no Mercado Interno e de Exportação</option>
+                                    <option value="56">56 - Operação com Direito a Crédito – Vinculada a Receitas
+                                        Tributadas e Não-Tributadas no Mercado Interno e de Exportação</option>
+                                    <option value="60">60 - Crédito Presumido – Operação de Aquisição Vinculada
+                                        Exclusivamente a Receita Tributada no Mercado Interno</option>
+                                    <option value="61">61 - Crédito Presumido – Operação de Aquisição Vinculada
+                                        Exclusivamente a Receita Não-Tributada no Mercado Interno</option>
+                                    <option value="62">62 - Crédito Presumido – Operação de Aquisição Vinculada
+                                        Exclusivamente a Receita de Exportação</option>
+                                    <option value="63">63 - Crédito Presumido – Operação de Aquisição Vinculada a
+                                        Receitas Tributadas e Não-Tributadas no Mercado Interno</option>
+                                    <option value="64">64 - Crédito Presumido – Operação de Aquisição Vinculada a
+                                        Receitas Tributadas no Mercado Interno e de Exportação</option>
+                                    <option value="65">65 - Crédito Presumido – Operação de Aquisição Vinculada a
+                                        Receitas Não-Tributadas no Mercado Interno e de Exportação</option>
+                                    <option value="66">66 - Crédito Presumido – Operação de Aquisição Vinculada a
+                                        Receitas Tributadas e Não-Tributadas no Mercado Interno e de Exportação</option>
+                                    <option value="67">67 - Crédito Presumido – Outras Operações</option>
+                                    <option value="70">70 - Operação de Aquisição sem Direito a Crédito</option>
+                                    <option value="71">71 - Operação de Aquisição com Isenção</option>
+                                    <option value="72">72 - Operação de Aquisição com Suspensão</option>
+                                    <option value="73">73 - Operação de Aquisição a Alíquota Zero</option>
+                                    <option value="74">74 - Operação de Aquisição sem Incidência da Contribuição
+                                    </option>
+                                    <option value="75">75 - Operação de Aquisição por Substituição Tributária</option>
+                                    <option value="98">98 - Outras Operações de Entrada</option>
+                                    <option value="99">99 - Outras Operações</option>
+                                </select>
+                            </div>
+                            <div class="field-group col-full">
+                                <label>Tipo de Retenção (PIS/COFINS/CSLL)</label>
+                                <select id="TribFed_TipoRetencao" name="TribFed_TipoRetencao">
+                                    <option value="0">PIS/COFINS/CSLL Não Retidos</option>
+                                    <option value="3">PIS/COFINS/CSLL Retidos</option>
+                                    <option value="4">PIS/COFINS Retidos, CSLL Não Retido</option>
+                                    <option value="5">PIS Retido, COFINS/CSLL Não Retido</option>
+                                    <option value="6">COFINS Retido, PIS/CSLL Não Retido</option>
+                                </select>
+                            </div>
+                            <i class="field-hint" style="margin-top: 6px;">Imposto de Renda Retido na Fonte (IRRF) é uma
+                                obrigação tributária federal em que a pessoa jurídica ou equiparada, está obrigada a
+                                reter do beneficiário da renda, o imposto correspondente, nos termos estabelecidos pelo
+                                Regulamento do Imposto de Renda.</i>
+                            <div class="field-group">
+                                <label>Valor Retido IRRF (R$)</label>
+                                <input type="text" id="TribFed_ValorIRRF" name="TribFed_ValorIRRF" class="monetario"
+                                    placeholder="0,00">
+                            </div>
+                            <i class="field-hint" style="margin-top: 6px;">A Contribuição Previdenciária (CP) é um
+                                tributo federal e é composta pelo Risco Ambiental do Trabalho (RAT) ou Seguro de
+                                Acidente do Trabalho (SAT) e pela Contribuição Previdenciária Patronal (CPP). Essas
+                                contribuições são calculadas pela aplicação de uma alíquota sobre o total das
+                                remunerações pagas ou creditadas, no decorrer do mês, aos segurados empregados e
+                                trabalhadores avulsos e são destinadas ao financiamento da Seguridade Social. As
+                                contribuições mencionadas estão regidas pela lei 8.212/1991</i>
+                            <div class="field-group">
+                                <label>Contribuição Previdenciária - Retida</label>
+                                <input type="text" id="TribFed_ValorCP" name="TribFed_ValorCP" class="monetario"
+                                    placeholder="0,00">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field-block">
+                        <div class="block-header">
+                            <span class="block-tag">Aproximados</span>
+                            <span class="block-title">Valor Aproximado dos Tributos (Transparência)</span>
+                        </div>
+                        <div class="fields-grid">
+                            <div class="field-group col-full">
+                                <label>Tipo de Informação</label>
+                                <div class="radio-group" style="flex-wrap: wrap;">
+
+                                    <label class="radio-opt" style="width: 100%;"><input type="radio"
+                                            name="TribAprox_Tipo" value="1"> 1 - Preencher os valores monetários
+                                        (R$)</label>
+                                    <label class="radio-opt" style="width: 100%;"><input type="radio"
+                                            name="TribAprox_Tipo" value="2"> 2 - Configurar os valores percentuais
+                                        (%)</label>
+                                    <label class="radio-opt" style="width: 100%;"><input type="radio"
+                                            name="TribAprox_Tipo" value="3"> 3 - Não informar valor (Apenas MEI -
+                                        Decreto 8.264)</label>
+                                    <label class="radio-opt" style="width: 100%;"><input type="radio"
+                                            name="TribAprox_Tipo" value="4" checked> 4 - Informar alíquota do Simples
+                                        Nacional (ME/EPP)</label>
+
+                                </div>
+                            </div>
+
+                            <div id="Panel_TribAprox_ValoresMonetarios"
+                                style="display:none; grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                                <div class="field-group">
+                                    <label>Federal (R$) <span class="req">*</span></label>
+                                    <input type="text" id="TribAprox_ValorFederal" name="TribAprox_ValorFederal"
+                                        class="monetario" placeholder="0,00">
+                                </div>
+                                <div class="field-group">
+                                    <label>Estadual (R$) <span class="req">*</span></label>
+                                    <input type="text" id="TribAprox_ValorEstadual" name="TribAprox_ValorEstadual"
+                                        class="monetario" placeholder="0,00">
+                                </div>
+                                <div class="field-group">
+                                    <label>Municipal (R$) <span class="req">*</span></label>
+                                    <input type="text" id="TribAprox_ValorMunicipal" name="TribAprox_ValorMunicipal"
+                                        class="monetario" placeholder="0,00">
+                                </div>
+                            </div>
+
+                            <div id="Panel_TribAprox_ValoresPercentuais"
+                                style="display:none; grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                                <div class="field-group">
+                                    <label>Federal (%) <span class="req">*</span></label>
+                                    <input type="text" id="TribAprox_PercentualFederal"
+                                        name="TribAprox_PercentualFederal" class="percentual" placeholder="0,00">
+                                </div>
+                                <div class="field-group">
+                                    <label>Estadual (%) <span class="req">*</span></label>
+                                    <input type="text" id="TribAprox_PercentualEstadual"
+                                        name="TribAprox_PercentualEstadual" class="percentual" placeholder="0,00">
+                                </div>
+                                <div class="field-group">
+                                    <label>Municipal (%) <span class="req">*</span></label>
+                                    <input type="text" id="TribAprox_PercentualMunicipal"
+                                        name="TribAprox_PercentualMunicipal" class="percentual" placeholder="0,00">
+                                </div>
+                            </div>
+
+                            <div class="field-group" id="Panel_TribAprox_AliquotaSN">
+                                <label>Alíquota Simples Nacional (%)</label>
+                                <input type="text" id="TribAprox_AliquotaSN" name="TribAprox_AliquotaSN"
+                                    class="percentual" placeholder="Ex: 6,00">
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="preview-panel">
+                <div class="preview-header">
+                    <div style="display: flex; align-items: center;">
+                        <span class="preview-title">Prévia da Fila</span>
+                        <span class="preview-count" id="preview-count">0 registros</span>
+                    </div>
+                    <button id="btn-clear-queue" class="btn-danger-sm">🗑 Limpar Fila</button>
+                </div>
+                <div class="preview-table-wrap">
+                    <table id="preview-table">
+                        <thead>
+                            <tr id="table-head">
+                                <th>Competência</th>
+                                <th>Tomador</th>
+                                <th>Valor (R$)</th>
+                                <th>Descrição do Serviço</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body"></tbody>
+                    </table>
+                    <div class="empty-state" id="empty-state">Preencha os campos e adicione registros à fila para
+                        visualizar aqui.</div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script src="gerador.js"></script>
+</body>
+
+</html>

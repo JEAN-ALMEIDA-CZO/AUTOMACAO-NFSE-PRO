@@ -1,0 +1,389 @@
+/* 
+styles.css — Automação NFS-e PRO 
+ */
+
+/* ─── 1. PAINEL DE CONTROLE (INJETADO ACIMA DA NAVBAR) ─── */
+#nfse-pro-setup-banner {
+    background: #ffffff;
+    border-bottom: 3px solid #1351B4;
+    /* Azul Gov.br */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    padding: 12px 0;
+    position: relative;
+    z-index: 9999;
+}
+
+.nfse-banner-container {
+    max-width: 1170px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 15px;
+}
+
+.nfse-banner-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.nfse-banner-left img {
+    height: 40px;
+    width: 40px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.nfse-banner-text strong {
+    display: block;
+    font-size: 16px;
+    font-weight: 800;
+    color: #0C326F;
+    line-height: 1.2;
+}
+
+.nfse-banner-text span {
+    font-size: 11px;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.nfse-banner-center {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.nfse-btn {
+    padding: 9px 18px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.nfse-btn-outline {
+    background: transparent;
+    border: 1px solid #1351B4;
+    color: #1351B4;
+}
+
+.nfse-btn-outline:hover {
+    background: rgba(19, 81, 180, 0.05);
+}
+
+.nfse-file-wrapper {
+    position: relative;
+}
+
+#nfse-file-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    background: #f8fafc;
+    border: 1px dashed #94a3b8;
+    color: #475569;
+    cursor: pointer;
+    margin: 0;
+    transition: all 0.2s;
+}
+
+#nfse-file-label:hover {
+    border-color: #1351B4;
+    color: #1351B4;
+    background: #eff6ff;
+}
+
+.nfse-btn-solid {
+    background: #138E2C;
+    /* Verde Gov.br */
+    color: white;
+    box-shadow: 0 4px 10px rgba(19, 142, 44, 0.3);
+}
+
+.nfse-btn-solid:hover:not(:disabled) {
+    background: #0F6A21;
+    transform: translateY(-1px);
+}
+
+.nfse-btn-solid:disabled {
+    background: #94a3b8;
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.nfse-banner-right {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    border-left: 1px solid #e2e8f0;
+    padding-left: 15px;
+}
+
+.nfse-social-link {
+    color: #94a3b8;
+    transition: all 0.2s;
+    display: flex;
+}
+
+.nfse-social-link:hover {
+    color: #1351B4;
+    transform: scale(1.1);
+}
+
+.nfse-social-link svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+}
+
+
+/* ─── 2. TELA DE EXECUÇÃO (BLUR FULLSCREEN) ─── */
+#nfse-bot-overlay-fullscreen {
+    position: fixed;
+    inset: 0;
+    /* Reduzido o branco de 0.4 para 0.2 para maior transparência */
+    background: rgba(255, 255, 255, 0.2);
+    /* Reduzido o blur de 12px para 4px para revelar o fundo */
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 2147483647;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    animation: fadeInBlur 0.4s ease-out;
+}
+
+/* Animação ajustada para o novo nível de blur (4px) */
+@keyframes fadeInBlur {
+    from {
+        opacity: 0;
+        backdrop-filter: blur(0px);
+    }
+
+    to {
+        opacity: 1;
+        backdrop-filter: blur(4px);
+    }
+}
+
+.nfse-modal-card {
+    background: #fff;
+    border-radius: 12px;
+    width: 560px;
+    /* Largura aumentada de 420px para acomodar melhor os textos longos */
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    animation: scaleUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes scaleUp {
+    from {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.nfse-modal-header {
+    background: #0C326F;
+    color: #fff;
+    padding: 18px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.nfse-modal-badge {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-family: monospace;
+}
+
+.nfse-modal-body {
+    padding: 24px;
+}
+
+.nfse-input-group {
+    margin-bottom: 18px;
+}
+
+.nfse-input-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 6px;
+    display: block;
+}
+
+.nfse-fake-input {
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1e293b;
+    background: #f8fafc;
+    display: flex;
+    align-items: flex-start;
+    /* Alinha o indicador e o texto no topo se tiver quebra de linha */
+    gap: 10px;
+    white-space: normal;
+    /* Permite múltiplas linhas */
+    word-break: break-word;
+    /* Força a quebra de palavras muito longas */
+    line-height: 1.4;
+    /* Melhora a legibilidade do texto de status com múltiplas linhas */
+}
+
+.nfse-pulse-dot {
+    width: 12px;
+    height: 12px;
+    background: #10b981;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 4px;
+    /* Empurra levemente para baixo para alinhar perfeitamente com a 1ª linha de texto */
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+    animation: pulseDot 2s infinite;
+}
+
+@keyframes pulseDot {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+    }
+
+    70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+    }
+
+    100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    }
+}
+
+.nfse-btn-parar {
+    width: 100%;
+    padding: 14px;
+    background: transparent;
+    border: 2px solid #ef4444;
+    color: #ef4444;
+    font-weight: 700;
+    border-radius: 30px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    margin-top: 5px;
+}
+
+.nfse-btn-parar:hover {
+    background: #ef4444;
+    color: white;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.nfse-stepper {
+    display: flex;
+    justify-content: space-between;
+    margin: 20px 0;
+    position: relative;
+}
+
+.nfse-stepper::before {
+    content: '';
+    position: absolute;
+    top: 14px;
+    left: 10%;
+    right: 10%;
+    height: 2px;
+    background: #e2e8f0;
+    z-index: 1;
+}
+
+.nfse-step {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 25%;
+    gap: 8px;
+    opacity: 0.5;
+    transition: all 0.3s;
+}
+
+.nfse-step.active,
+.nfse-step.completed {
+    opacity: 1;
+}
+
+.nfse-step-circle {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid #cbd5e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #94a3b8;
+    transition: all 0.3s;
+}
+
+.nfse-step.active .nfse-step-circle {
+    border-color: #1351B4;
+    background: #1351B4;
+    color: white;
+    box-shadow: 0 0 0 4px rgba(19, 81, 180, 0.2);
+}
+
+.nfse-step.completed .nfse-step-circle {
+    border-color: #138E2C;
+    background: #138E2C;
+    color: white;
+    font-size: 0;
+}
+
+.nfse-step.completed .nfse-step-circle::after {
+    content: '✓';
+    font-size: 14px;
+}
+
+.nfse-step span {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #475569;
+}
