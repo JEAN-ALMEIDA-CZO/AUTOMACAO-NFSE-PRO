@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Automação NFS-e PRO",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Emissão automatizada e exportação em massa (XML/PDF e Relatório) do Emissor Nacional NFS-e.",
   "permissions": [
     "storage",
@@ -32,13 +32,6 @@
   "content_scripts": [
     {
       "matches": ["https://www.nfse.gov.br/EmissorNacional/*"],
-      "js": ["bridge.js"],
-      "css": [],
-      "run_at": "document_start",
-      "world": "MAIN"
-    },
-    {
-      "matches": ["https://www.nfse.gov.br/EmissorNacional/*"],
       "js": ["content.js"],
       "css": ["styles.css"],
       "run_at": "document_end"
@@ -57,15 +50,9 @@
       "resources": [
         "icons/icon16.png",
         "icons/icon48.png",
-        "icons/icon128.png",
-        "gerador.html",
-        "gerador.js",
-        "gerador.css"
+        "icons/icon128.png"
       ],
-      "matches": [
-        "https://www.nfse.gov.br/*",
-        "chrome-extension://*/*"
-      ]
+      "matches": ["https://www.nfse.gov.br/*"]
     }
   ]
 }

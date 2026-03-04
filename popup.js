@@ -1,5 +1,6 @@
 /**
  * popup.js — Automação NFS-e Nacional Pro
+ * Integração com interface Glassmorphism/Gov.br e Monitoramento em Tempo Real das etapas.
  */
 
 const FIELD_MAPPING = {

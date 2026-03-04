@@ -1,6 +1,7 @@
-/* 
-styles.css — Automação NFS-e PRO 
- */
+/* ==========================================================================
+   styles.css — Automação NFS-e PRO (UI NATIVA NO PORTAL GOV)
+   SEM FONTES EXTERNAS PARA EVITAR CSP
+   ========================================================================== */
 
 /* ─── 1. PAINEL DE CONTROLE (INJETADO ACIMA DA NAVBAR) ─── */
 #nfse-pro-setup-banner {

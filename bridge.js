@@ -1,292 +1,143 @@
 /**
- * bridge.js — Automação NFS-e PRO
+* bridge.js
  */
 (function () {
-    'use strict';
-
-    // ── EXCEÇÃO PERSONALIZADA ────────────────────────────────────────────────
-    class BridgeIntegrationException extends Error {
-        constructor(message, originalError, payload) {
-            super(message);
-            this.name = 'BridgeIntegrationException';
-            this.originalError = originalError;
-            this.payload = payload;
-        }
-    }
-
-    function logSurgicalError(fileName, lineStr, exception) {
-        let payloadSafe = {};
-        if (exception.payload) {
-            payloadSafe = JSON.parse(JSON.stringify(exception.payload));
-            if (payloadSafe.value && typeof payloadSafe.value === 'string' && payloadSafe.value.length > 10) {
-                payloadSafe.value = payloadSafe.value.substring(0, 4) + '***'; // Mascaramento básico
-            }
-        }
-        
-        console.error(
-            `[FATAL ERROR] ${exception.name}: ${exception.message}\n` +
-            `[FILE] ${fileName}\n` +
-            `[CONTEXT LINE] ${lineStr}\n` +
-            `[ORIGINAL MSG] ${exception.originalError ? exception.originalError.message : 'N/A'}\n` +
-            `[PAYLOAD] ${JSON.stringify(payloadSafe)}\n` +
-            `[STACK TRACE] ${exception.stack}`
-        );
-    }
-
-    // ── GUARD: evita dupla injeção ───────────────────────────────────────────
     if (window.__nfseBridgeLoaded) return;
     window.__nfseBridgeLoaded = true;
 
-    console.log('[AUTOMAÇÃO NFSE] Bridge v4 carregada no contexto MAIN da página.');
+    console.log('[AUTOMAÇÃO NFSE] Bridge carregada no contexto MAIN da página.');
 
-    // ── CONSTANTES ───────────────────────────────────────────────────────────
-    var SELECT2_RESULT_TIMEOUT_MS = 9000;
-
-    // ── LISTENER PRINCIPAL ───────────────────────────────────────────────────
     window.addEventListener('message', function (event) {
         if (!event.data || event.data.source !== 'EXTENSION_ROBO_NFSE') return;
 
-        var type     = event.data.type;
-        var selector = event.data.selector;
-        var value    = event.data.value;
-        var fieldType = event.data.fieldType;
+        const { type, selector, value, fieldType } = event.data;
 
+        // ── INTEGRAÇÃO COM A VERSÃO ATUALIZADA DO CONTENT.JS ──────────
+        if (type === 'TRIGGER_CHOSEN') {
+            const jQ = getjQ();
+            if (jQ) {
+                try {
+                    const el = jQ(selector);
+                    if (el.length) {
+                        el.val(value);
+                        el.trigger('change');
+                        el.trigger('chosen:updated'); // Comando específico do plugin Chosen
+                        el.trigger('select2:select'); // Comando específico do Select2 (se houver)
+                        console.log(`[AUTOMAÇÃO NFSE] jQuery disparado em ${selector} com valor ${value}`);
+                    }
+                } catch (err) {
+                    console.error("[AUTOMAÇÃO NFSE] Erro ao executar TRIGGER_CHOSEN:", err);
+                }
+            } else {
+                console.warn("[AUTOMAÇÃO NFSE] jQuery não encontrado na página para TRIGGER_CHOSEN.");
+            }
+        }
+
+        // ── Atualiza campo comum (input, select, textarea) ────────────
         if (type === 'TRIGGER_FIELD_UPDATE') {
             updateField(selector, value, fieldType);
-            return;
         }
 
+        // Abre o menu Dropdown do Select2 nativamente
         if (type === 'OPEN_SELECT2') {
-            var jQ = getjQ();
+            const jQ = getjQ();
             if (jQ) {
-                try { 
-                    var el = jQ(selector);
-                    if (el.length) el.select2('open'); 
-                }
-                catch (e) { 
-                    logSurgicalError('bridge.js', 'Listener OPEN_SELECT2', new BridgeIntegrationException('Falha ao abrir componente Select2 nativo', e, { selector: selector }));
-                }
+                try { jQ(selector).select2('open'); } catch(e) { console.warn('Falha ao abrir Select2 via jQuery:', e); }
             }
-            return;
         }
 
+        // Fecha o menu Dropdown do Select2 nativamente
         if (type === 'CLOSE_SELECT2') {
-            var jQc = getjQ();
-            if (jQc) {
-                try { 
-                    var elC = jQc(selector);
-                    if (elC.length) elC.select2('close'); 
-                } catch (e) { /* silencioso no fechamento */ }
+            const jQ = getjQ();
+            if (jQ) {
+                try { jQ(selector).select2('close'); } catch(e) {}
             }
-            return;
         }
 
-        if (type === 'SELECT2_WAIT_RESULT') {
-            var waitTimeout = event.data.timeout || SELECT2_RESULT_TIMEOUT_MS;
-            startResultObserver(selector, waitTimeout);
-            return;
-        }
-
+        // CONFIRMAÇÃO ORGÂNICA VIA DUPLO TAB (A solução definitiva)
         if (type === 'SELECT2_CONFIRM') {
-            confirmAfterResultVisible(selector);
-            return;
+            const jQ = getjQ();
+            if (jQ) {
+                // Encontra a barra de busca ativa do Select2
+                const searchField = jQ('.select2-container--open .select2-search__field');
+                if (searchField.length) {
+                    // O pulo do gato: No ecossistema Select2 do Governo, a tecla TAB (keyCode 9) 
+                    // no campo de busca seleciona a opção atual (ajax) e fecha o dropdown.
+                    searchField.trigger(jQ.Event('keydown', { keyCode: 9, which: 9, key: 'Tab', bubbles: true }));
+                    searchField.trigger(jQ.Event('keyup',   { keyCode: 9, which: 9, key: 'Tab', bubbles: true }));
+
+                    // Aguarda a interface se estabilizar e força o segundo "TAB" humano (ir para o próximo campo)
+                    setTimeout(function() {
+                         if (selector) {
+                             const el = jQ(selector);
+                             
+                             // Garante que os validadores (Intelephense/ASP.NET MVC) saibam da mudança
+                             el.trigger('change.select2');
+                             el.trigger('change');
+                             el.removeClass('input-validation-error');
+                             
+                             const formGroup = el.closest('.form-group');
+                             if (formGroup.length) {
+                                 formGroup.removeClass('erro');
+                                 formGroup.find('.field-validation-error').empty().removeClass('text-danger');
+                             }
+                             
+                             // Move fisicamente o foco para o próximo campo visível iterável do formulário
+                             const container = el.next('.select2-container');
+                             const allFocusables = jQ('input:not([type="hidden"]), select:not(.select2-hidden-accessible), .select2-selection, textarea, button').filter(':visible:not([disabled]):not([tabindex="-1"])');
+                             
+                             let currentIdx = -1;
+                             if (container.length) {
+                                 currentIdx = allFocusables.index(container.find('.select2-selection'));
+                             } else {
+                                 currentIdx = allFocusables.index(el);
+                             }
+
+                             if (currentIdx > -1 && currentIdx < allFocusables.length - 1) {
+                                 allFocusables.eq(currentIdx + 1).focus();
+                             }
+                         }
+                    }, 350);
+                }
+            }
         }
 
+        // Dispara seleção Select2 (Fallback extremo bruto)
         if (type === 'TRIGGER_SELECT2') {
             triggerSelect2BySearch(selector, value);
-            return;
         }
 
+        // Clique nativo via jQuery
         if (type === 'TRIGGER_CLICK_NATIVE') {
             triggerClick(selector);
-            return;
         }
     });
 
-    // =========================================================================
-    // FUNÇÕES PRIVADAS
-    // =========================================================================
+    // ── HELPERS ───────────────────────────────────────────────────
 
     function getjQ() {
-        return window.jQuery || window.$ || null;
+        return window.jQuery || window.$;
     }
 
-    function findResultsList(selectSelector) {
-        var rawId = selectSelector ? selectSelector.replace(/^#/, '') : '';
-        if (rawId) {
-            var byId = document.getElementById('select2-' + rawId + '-results');
-            if (byId) return byId;
-        }
-        var allLists = document.querySelectorAll('ul.select2-results__options');
-        for (var i = allLists.length - 1; i >= 0; i--) {
-            var rect = allLists[i].getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0) return allLists[i];
-        }
-        return null;
-    }
-
-    function hasRealResult(list) {
-        if (!list) return false;
-        var items = list.querySelectorAll('li.select2-results__option');
-        for (var i = 0; i < items.length; i++) {
-            var item = items[i];
-            if (item.getAttribute('aria-disabled') === 'true') continue;
-            if (/loading-results|select2-results__message/.test(item.className)) continue;
-            var text = item.innerText || item.textContent || '';
-            if (text.trim().length > 0) return true;
-        }
-        return false;
-    }
-
-    function findSearchInput() {
-        var jQ = getjQ();
-        if (jQ) {
-            var vis = jQ('input.select2-search__field:visible').last();
-            if (vis.length) return vis[0];
-        }
-        var inputs = document.querySelectorAll('input.select2-search__field');
-        for (var i = inputs.length - 1; i >= 0; i--) {
-            var r = inputs[i].getBoundingClientRect();
-            if (r.width > 0 && r.height > 0) return inputs[i];
-        }
-        return null;
-    }
-
-    function startResultObserver(selectSelector, timeoutMs) {
-        var resolved  = false;
-        var observer  = null;
-        var timeoutId = null;
-
-        function resolve(status) {
-            if (resolved) return;
-            resolved = true;
-            if (observer)  { observer.disconnect();  observer  = null; }
-            if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
-
-            window.postMessage({
-                source:   'EXTENSION_ROBO_NFSE_BRIDGE',
-                type:     status === 'ok' ? 'SELECT2_RESULT_READY' : 'SELECT2_RESULT_TIMEOUT',
-                selector: selectSelector
-            }, '*');
-        }
-
-        var listNow = findResultsList(selectSelector);
-        if (listNow && hasRealResult(listNow)) {
-            resolve('ok');
-            return;
-        }
-
-        observer = new MutationObserver(function () {
-            var l = findResultsList(selectSelector);
-            if (l && hasRealResult(l)) resolve('ok');
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
-
-        timeoutId = setTimeout(function () { resolve('timeout'); }, timeoutMs);
-    }
-
-    function confirmAfterResultVisible(selectSelector) {
-        var confirmed  = false;
-        var observer   = null;
-        var timeoutId  = null;
-
-        function doConfirm() {
-            if (confirmed) return;
-            confirmed = true;
-            if (observer)  { observer.disconnect();  observer  = null; }
-            if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
-
-            var jQ          = getjQ();
-            var searchInput = findSearchInput();
-
-            if (jQ && searchInput) {
-                var $input = jQ(searchInput);
-                $input.trigger(jQ.Event('keydown', { keyCode: 13, which: 13, key: 'Enter', bubbles: true }));
-                $input.trigger(jQ.Event('keyup',   { keyCode: 13, which: 13, key: 'Enter', bubbles: true }));
-
-                setTimeout(function () {
-                    $input.trigger(jQ.Event('keydown', { keyCode: 9, which: 9, key: 'Tab', bubbles: true }));
-                    if (selectSelector) {
-                        setTimeout(function () { cleanValidationErrors(selectSelector); }, 500);
-                    }
-                    window.postMessage({
-                        source:   'EXTENSION_ROBO_NFSE_BRIDGE',
-                        type:     'SELECT2_CONFIRMED',
-                        selector: selectSelector
-                    }, '*');
-                }, 200);
-
-            } else if (searchInput) {
-                searchInput.dispatchEvent(new KeyboardEvent('keydown', { keyCode: 13, which: 13, key: 'Enter', bubbles: true }));
-                searchInput.dispatchEvent(new KeyboardEvent('keyup',   { keyCode: 13, which: 13, key: 'Enter', bubbles: true }));
-                setTimeout(function () {
-                    searchInput.dispatchEvent(new KeyboardEvent('keydown', { keyCode: 9, which: 9, key: 'Tab', bubbles: true }));
-                    if (selectSelector) setTimeout(function () { cleanValidationErrors(selectSelector); }, 500);
-                    window.postMessage({
-                        source:   'EXTENSION_ROBO_NFSE_BRIDGE',
-                        type:     'SELECT2_CONFIRMED',
-                        selector: selectSelector
-                    }, '*');
-                }, 200);
-            } else {
-                window.postMessage({
-                    source:   'EXTENSION_ROBO_NFSE_BRIDGE',
-                    type:     'SELECT2_CONFIRMED',
-                    selector: selectSelector
-                }, '*');
-            }
-        }
-
-        var listNow = findResultsList(selectSelector);
-        if (listNow && hasRealResult(listNow)) {
-            doConfirm();
-            return;
-        }
-
-        observer = new MutationObserver(function () {
-            var l = findResultsList(selectSelector);
-            if (l && hasRealResult(l)) doConfirm();
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
-
-        timeoutId = setTimeout(function () {
-            console.warn('[AUTOMAÇÃO NFSE] SELECT2_CONFIRM: timeout. Confirmando mesmo sem resultado visível...');
-            doConfirm();
-        }, SELECT2_RESULT_TIMEOUT_MS);
-    }
-
-    function cleanValidationErrors(selectSelector) {
-        var jQ = getjQ();
-        if (!jQ) return;
-        try {
-            var el = jQ(selectSelector);
-            if (!el.length) return;
-            el.trigger('change.select2');
-            el.trigger('change');
-            el.removeClass('input-validation-error');
-            var formGroup = el.closest('.form-group');
-            if (formGroup.length) {
-                formGroup.removeClass('erro');
-                formGroup.find('.field-validation-error').empty().removeClass('text-danger');
-            }
-        } catch (e) { 
-            logSurgicalError('bridge.js', 'cleanValidationErrors', new BridgeIntegrationException('Erro ao limpar classes de validação DOM', e, { selector: selectSelector }));
-        }
-    }
+    // ── ATUALIZAÇÃO DE CAMPO GENÉRICO ─────────────────────────────
 
     function updateField(selector, value, fieldType) {
-        var jQ = getjQ();
+        const jQ = getjQ();
+
         if (!jQ) {
-            console.warn('[AUTOMAÇÃO NFSE] jQuery não encontrado. Fallback nativo.');
+            console.warn('[AUTOMAÇÃO NFSE] jQuery não encontrado. Usando Fallback nativo.');
             nativeFallback(selector, value);
             return;
         }
+
         try {
-            var el = jQ(selector);
+            const el = jQ(selector);
             if (!el.length) return;
+
             if (String(el.val()) === String(value)) return;
 
             el.val(value);
+
             if (el.hasClass('select2-hidden-accessible')) {
                 el.trigger('change.select2');
                 el.trigger('change');
@@ -303,99 +154,69 @@
                     el.trigger('blur');
                 }
             }
+
         } catch (err) {
-            logSurgicalError('bridge.js', 'updateField', new BridgeIntegrationException('Falha ao atualizar campo via jQuery', err, { selector: selector, value: value }));
             nativeFallback(selector, value);
         }
     }
 
+    // ── SELECT2 VIA JQUERY (FALLBACK EXTREMO) ─────────────────────
+
     function triggerSelect2BySearch(selector, value) {
-        var jQ = getjQ();
-
-        function sendConfirmed() {
-            window.postMessage({
-                source: 'EXTENSION_ROBO_NFSE_BRIDGE',
-                type: 'SELECT2_CONFIRMED',
-                selector: selector
-            }, '*');
-        }
-
+        const jQ = getjQ();
         if (!jQ) {
             nativeFallback(selector, value);
-            sendConfirmed();
             return;
         }
 
         try {
-            var el = jQ(selector);
-            if (!el.length) {
-                sendConfirmed();
+            const el = jQ(selector);
+            if (!el.length) return;
+
+            const hasSelect2 = el.hasClass('select2-hidden-accessible') || typeof el.select2 === 'function';
+
+            if (!hasSelect2) {
+                updateField(selector, value);
                 return;
             }
 
-            try { el.select2('open'); } catch (e) { /* silencioso */ }
+            if (el.find(`option[value="${value}"]`).length === 0) {
+                const optTemp = new Option(value, value, true, true);
+                el.append(optTemp);
+            }
 
-            setTimeout(function () {
-                var searchInput = findSearchInput() || document.querySelector('input.select2-search__field');
+            el.val(value);
+            el.trigger({
+                type: 'select2:select',
+                params: { data: { id: value, text: value } }
+            });
 
-                if (searchInput) {
-                    var $input = jQ(searchInput);
-                    $input.val(value).trigger('input');
+            el.trigger('change.select2');
+            el.trigger('change');
+            
+            try { el.select2('close'); } catch(e) {}
 
-                    $input.trigger(jQ.Event('keydown', { keyCode: 65, which: 65, key: 'a' }));
-                    $input.trigger(jQ.Event('keyup',   { keyCode: 65, which: 65, key: 'a' }));
-
-                    var attempts = 0;
-                    var maxAttempts = 40; 
-                    var checkInterval = setInterval(function () {
-                        attempts++;
-                        var list = findResultsList(selector);
-
-                        if (hasRealResult(list)) {
-                            clearInterval(checkInterval);
-
-                            $input.trigger(jQ.Event('keydown', { keyCode: 13, which: 13, key: 'Enter' }));
-                            $input.trigger(jQ.Event('keyup',   { keyCode: 13, which: 13, key: 'Enter' }));
-
-                            setTimeout(function () {
-                                $input.trigger(jQ.Event('keydown', { keyCode: 9, which: 9, key: 'Tab' }));
-                                cleanValidationErrors(selector);
-                                try { el.select2('close'); } catch (e) { /* silencioso */ }
-                                el.trigger('change');
-                                sendConfirmed();
-                            }, 300);
-
-                        } else if (attempts >= maxAttempts) {
-                            clearInterval(checkInterval);
-                            console.warn('[AUTOMAÇÃO NFSE] Fallback Select2: Timeout aguardando AJAX para', selector);
-                            try { el.select2('close'); } catch (e) { /* silencioso */ }
-                            sendConfirmed();
-                        }
-                    }, 200);
-
-                } else {
-                    console.warn('[AUTOMAÇÃO NFSE] Fallback Select2: Search input não encontrado para', selector);
-                    nativeFallback(selector, value);
-                    sendConfirmed();
-                }
-            }, 500); 
         } catch (err) {
-            logSurgicalError('bridge.js', 'triggerSelect2BySearch', new BridgeIntegrationException('Falha crítica no Fallback Integrado AJAX', err, { selector: selector, value: value }));
             nativeFallback(selector, value);
-            sendConfirmed();
         }
     }
 
+    // ── FALLBACK NATIVO ───────────────────────────────────────────
+
     function nativeFallback(selector, value) {
-        var el = document.querySelector(selector);
+        const el = document.querySelector(selector);
         if (!el) return;
+
         if (el.value === String(value)) return;
 
         try {
-            var proto = Object.getPrototypeOf(el);
-            var desc  = Object.getOwnPropertyDescriptor(proto, 'value');
-            if (desc && desc.set) { desc.set.call(el, value); }
-            else { el.value = value; }
+            const proto = Object.getPrototypeOf(el);
+            const desc  = Object.getOwnPropertyDescriptor(proto, 'value');
+            if (desc && desc.set) {
+                desc.set.call(el, value);
+            } else {
+                el.value = value;
+            }
         } catch (e) {
             el.value = value;
         }
@@ -405,11 +226,14 @@
         el.dispatchEvent(new Event('blur',   { bubbles: true }));
     }
 
+    // ── CLIQUE NATIVO ─────────────────────────────────────────────
+
     function triggerClick(selector) {
-        var jQ = getjQ();
-        if (jQ) { jQ(selector).trigger('click'); }
-        else {
-            var el = document.querySelector(selector);
+        const jQ = getjQ();
+        if (jQ) {
+            jQ(selector).trigger('click');
+        } else {
+            const el = document.querySelector(selector);
             if (el) el.click();
         }
     }

@@ -241,7 +241,7 @@ if (!window.baixadorXmlV4Iniciado) {
       
       let mensagem = "✅ VARREDURA CONCLUÍDA COM SUCESSO!\n\n";
       mensagem += `📊 Total de notas encontradas: ${todasNotas.length}\n`;
-      mensagem += `💰 Valor total válido: R$ ${totalFormatado}\n\n`;
+      mensagem += `💰 Valor total: R$ ${totalFormatado}\n\n`;
       alert(mensagem);
       
       criarInterfaceFlutuante(todasNotas, true);
@@ -342,7 +342,9 @@ if (!window.baixadorXmlV4Iniciado) {
           if (partes[0]) nomeTitular = partes[0].replace(/CNPJ/i, '').replace(/CPF/i, '').replace(/\s+/g, ' ').trim();
         }
       }
-    } catch (e) {}
+    } catch (e) {
+        console.error("[AUTOMAÇÃO NFSE] Erro ao extrair dados do perfil", e);
+    }
     return { nomeTitular, docTitular };
   }
 
@@ -385,7 +387,7 @@ if (!window.baixadorXmlV4Iniciado) {
         const divConteudo = celulaTomador.querySelector('div');
         if (divConteudo) {
           const textoCompleto = divConteudo.innerText.trim();
-          const spanCnpj = divConteudo.querySelector('span.cnpj');
+          const spanCnpj = divConteudo.querySelector('span.cnpj') || divConteudo.querySelector('span.cpf') || divConteudo.querySelector('span.nif');
           if (spanCnpj) {
             docTomador = spanCnpj.innerText.trim();
             const partes = textoCompleto.split(docTomador);
@@ -402,7 +404,9 @@ if (!window.baixadorXmlV4Iniciado) {
           }
         }
       }
-    } catch (e) {}
+    } catch (e) {
+        console.error("[AUTOMAÇÃO NFSE] Erro ao extrair Tomador", e);
+    }
     if (!nomeTomador || nomeTomador === "") nomeTomador = "Tomador Nao Identificado";
     return { nomeTomador, docTomador };
   }
@@ -413,7 +417,7 @@ if (!window.baixadorXmlV4Iniciado) {
     const linhas = document.querySelectorAll(CONFIG.seletorTabela);
     const notas = [];
 
-    linhas.forEach((linha, i) => {
+    linhas.forEach((linha) => {
       let idNota = encontrarIdNotaNaLinha(linha);
       if (idNota) {
         idNota = idNota.trim();
@@ -421,36 +425,47 @@ if (!window.baixadorXmlV4Iniciado) {
         const celulaData = linha.querySelector('td.td-data');
         if (celulaData) dataEmissao = celulaData.innerText.trim().split('\n')[0];
 
-        // 1. Tenta recuperar visualmente (resolvendo problema do tooltip vazio)
+        // Lendo da Fonte da Verdade (Data Attributes) para identificar o Status
+        const sitDataAtrib = linha.getAttribute('data-situacao') || '';
         let statusNota = "Emitida";
-        const celulaSituacao = linha.querySelector('td.td-situacao');
-        if (celulaSituacao) {
-          const imgStatus = celulaSituacao.querySelector('img');
-          if (imgStatus) {
-             statusNota = imgStatus.getAttribute('data-original-title') || imgStatus.getAttribute('title') || "Emitida";
-          } else {
-             statusNota = celulaSituacao.innerText.trim() || "Emitida";
-          }
-        }
-
-        // 2. Fallback de Segurança Robusto (Lendo atributo nativo da linha do sistema)
-        const dataSituacao = linha.getAttribute('data-situacao') || '';
-        if (dataSituacao.includes('CANCELADA')) {
-            statusNota = "NFS-e cancelada";
-        } else if (dataSituacao.includes('SUBSTITUIDA')) {
-            statusNota = "NFS-e substituída";
+        
+        if (sitDataAtrib.includes('CANCELADA')) {
+            statusNota = "NFS-e Cancelada";
+        } else if (sitDataAtrib.includes('SUBSTITUIDA')) {
+            statusNota = "NFS-e Substituída";
+        } else {
+            // Fallback visual
+            const celulaSituacao = linha.querySelector('td.td-situacao');
+            if (celulaSituacao) {
+              const imgStatus = celulaSituacao.querySelector('img');
+              if (imgStatus) {
+                  statusNota = imgStatus.getAttribute('data-original-title') || imgStatus.getAttribute('title') || "Emitida";
+              } else {
+                  statusNota = celulaSituacao.innerText.trim() || "Emitida";
+              }
+            }
         }
 
         let valorTexto = "0,00";
         let valorFloat = 0.0;
-        const celulaValor = linha.querySelector('td.td-valor');
-        if (celulaValor) {
-          valorTexto = celulaValor.innerText.trim();
-          valorFloat = limparValorMonetario(valorTexto);
+        
+        // Pegando o Valor cru nativo do Governo para garantir calculo limpo
+        const valDataAtrib = linha.getAttribute('data-valor');
+        if (valDataAtrib) {
+            valorFloat = parseFloat(valDataAtrib.replace(',', '.'));
+            valorTexto = valorFloat.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        } else {
+            // Fallback visual
+            const celulaValor = linha.querySelector('td.td-valor');
+            if (celulaValor) {
+              valorTexto = celulaValor.innerText.trim();
+              valorFloat = limparValorMonetario(valorTexto);
+            }
         }
 
+        // Se a nota estiver cancelada, não importa qual era o valor bruto de emissão, no balanço é 0.
         const statusLower = statusNota.toLowerCase();
-        if (statusLower.includes('cancelada') || statusLower.includes('substituida') || statusLower.includes('substituída')) {
+        if (statusLower.includes('cancelada') || statusLower.includes('substituida') || statusLower.includes('rejeitada')) {
             valorFloat = 0.0;
         }
 
@@ -481,7 +496,7 @@ if (!window.baixadorXmlV4Iniciado) {
     const linhas = document.querySelectorAll(CONFIG.seletorTabela);
     const notas = [];
 
-    linhas.forEach((linha, i) => {
+    linhas.forEach((linha) => {
       const cols = linha.querySelectorAll('td');
       if (cols.length < 5) return;
 
@@ -502,31 +517,41 @@ if (!window.baixadorXmlV4Iniciado) {
       }
 
       const dataGeracao = cols[0].innerText.trim().split(' ')[0];
-      let valorTexto = cols[3].innerText.trim();
-      let valorFloat = limparValorMonetario(valorTexto);
       
-      // 1. Tenta recuperar visualmente (resolvendo problema do tooltip vazio)
+      // Validacao segura da Situacao
+      const sitDataAtrib = linha.getAttribute('data-situacao') || '';
       let statusNota = "Recebida";
-      const imgStatus = cols[4].querySelector('img');
-      if (imgStatus) {
-          statusNota = imgStatus.getAttribute('data-original-title') || imgStatus.getAttribute('title') || "Recebida";
+      
+      if (sitDataAtrib.includes('CANCELADA')) {
+          statusNota = "NFS-e Cancelada";
+      } else if (sitDataAtrib.includes('SUBSTITUIDA')) {
+          statusNota = "NFS-e Substituída";
+      } else if (sitDataAtrib.includes('REJEITADA')) {
+          statusNota = "NFS-e Rejeitada";
       } else {
-          statusNota = cols[4].innerText.trim() || "Recebida";
+          const imgStatus = cols[4] ? cols[4].querySelector('img') : null;
+          if (imgStatus) {
+              statusNota = imgStatus.getAttribute('data-original-title') || imgStatus.getAttribute('title') || "Recebida";
+          }
       }
 
-      // 2. Fallback de Segurança Robusto (Lendo atributo nativo da linha do sistema)
-      const dataSituacao = linha.getAttribute('data-situacao') || '';
-      if (dataSituacao.includes('CANCELADA')) {
-          statusNota = "NFS-e cancelada";
-      } else if (dataSituacao.includes('REJEITADA')) {
-          statusNota = "NFS-e rejeitada";
-      } else if (dataSituacao.includes('SUBSTITUIDA')) {
-          statusNota = "NFS-e substituída";
+      // Extração rigorosa de valor
+      let valorTexto = "0,00";
+      let valorFloat = 0.0;
+      const valDataAtrib = linha.getAttribute('data-valor');
+      
+      if (valDataAtrib) {
+          valorFloat = parseFloat(valDataAtrib.replace(',', '.'));
+          valorTexto = valorFloat.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      } else {
+          valorTexto = cols[3] ? cols[3].innerText.trim() : "0,00";
+          valorFloat = limparValorMonetario(valorTexto);
       }
 
+      // Zero Notas Recebidas e Canceladas na Origem
       const statusLower = statusNota.toLowerCase();
-      if (statusLower.includes('cancelada') || statusLower.includes('rejeitada') || statusLower.includes('substituida') || statusLower.includes('substituída')) {
-        valorFloat = 0.0;
+      if (statusLower.includes('cancelada') || statusLower.includes('substituida') || statusLower.includes('rejeitada')) {
+          valorFloat = 0.0;
       }
 
       notas.push({
@@ -673,7 +698,10 @@ if (!window.baixadorXmlV4Iniciado) {
             btnBaixar.style.backgroundColor = '#94a3b8';
             btnBaixar.style.cursor = 'not-allowed';
         } else {
-            spanTexto.textContent = isModoGlobal ? `${acao} (${listaNotas.length} Notas)` : `${acao} da Página (${listaNotas.length})`;
+            let somaTotalVisual = 0;
+            listaNotas.forEach(n => somaTotalVisual += n.valorFloat);
+            
+            spanTexto.textContent = isModoGlobal ? `${acao} (${listaNotas.length} Notas)` : `${acao} da Página (${listaNotas.length} | R$ ${somaTotalVisual.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
             btnBaixar.disabled = false;
             btnBaixar.style.backgroundColor = '#138E2C';
             btnBaixar.style.cursor = 'pointer';
@@ -848,79 +876,35 @@ if (!window.baixadorXmlV4Iniciado) {
     const isRecebida = listaNotas[0].tipo === 'RECEBIDA';
     const tipoRelatorio = isRecebida ? "NOTAS RECEBIDAS (TOMADAS)" : "NOTAS EMITIDAS (PRESTADAS)";
 
-    let conteudo = `RELATÓRIO DE NOTAS FISCAIS - ${tipoRelatorio}\n${'='.repeat(150)}\nPASTA: ${pasta}\nGerado em: ${new Date().toLocaleString('pt-BR')}\nTotal Geral de Notas: ${listaNotas.length}\n${'='.repeat(150)}\n\n`;
+    let conteudo = `RELATÓRIO DE NOTAS FISCAIS - ${tipoRelatorio}\n${'='.repeat(150)}\nPASTA: ${pasta}\nGerado em: ${new Date().toLocaleString('pt-BR')}\nTotal de Notas: ${listaNotas.length}\n${'='.repeat(150)}\n\n`;
     
-    const labelParte = isRecebida ? "PRESTADOR" : "TOMADOR";
-    const headerTabela = `DATA        | ID NOTA             |      VALOR (R$) | SITUAÇÃO          | ${labelParte}\n${'-'.repeat(150)}\n`;
-
-    const notasValidas = [];
-    const notasCanceladas = [];
-    let totalValido = 0.0;
-    let totalCancelado = 0.0;
+    conteudo += `DATA        | ID NOTA             |      VALOR (R$) | SITUAÇÃO          | ${isRecebida ? "PRESTADOR" : "TOMADOR"}\n${'-'.repeat(150)}\n`;
+    
+    let total = 0.0, totalCanceladas = 0;
 
     listaNotas.forEach(nota => {
-      const statusLower = nota.status.toLowerCase();
-      // Checa os status comuns de invalidação (ajustado para incluir "substituída" com acento por garantia)
-      if (statusLower.includes('cancelada') || statusLower.includes('rejeitada') || statusLower.includes('substituida') || statusLower.includes('substituída')) {
-        notasCanceladas.push(nota);
-        // Calcula o valor original pelo texto, já que valorFloat é 0 nessas notas
-        totalCancelado += limparValorMonetario(nota.valorTexto);
-      } else {
-        notasValidas.push(nota);
-        totalValido += nota.valorFloat;
-      }
+      conteudo += `${nota.dataEvento.padEnd(12)}| ${nota.id.substring(nota.id.length - 18).padEnd(20)}| ${nota.valorTexto.padStart(15)} | ${nota.status.substring(0, 18).padEnd(18)}| ${nota.parteNome.substring(0, 50)}\n`;
+      total += nota.valorFloat;
+      if (nota.status.toLowerCase().includes('cancelada') || nota.status.toLowerCase().includes('rejeitada') || nota.status.toLowerCase().includes('substituída')) totalCanceladas++;
     });
 
-    // --- BLOCO: NOTAS VÁLIDAS ---
-    conteudo += `>>> NOTAS VÁLIDAS (${notasValidas.length})\n\n`;
-    conteudo += headerTabela;
+    conteudo += `${'-'.repeat(150)}\n\nRESUMO FINANCEIRO:\n${'-'.repeat(150)}\nTotal Válidas: ${listaNotas.length - totalCanceladas}\nCanceladas/Substituídas: ${totalCanceladas}\n\nVALOR TOTAL REAL: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n`;
+
+    // Converte o texto para Base64 (Lidando com acentuação via encodeURIComponent para evitar quebra de caracteres)
+    const base64Content = btoa(unescape(encodeURIComponent(conteudo)));
+    const dataUrl = 'data:text/plain;charset=utf-8;base64,' + base64Content;
     
-    if (notasValidas.length === 0) {
-      conteudo += `Nenhuma nota válida encontrada.\n`;
-    } else {
-      notasValidas.forEach(nota => {
-        const idVisual = nota.id.substring(Math.max(0, nota.id.length - 18)).padEnd(20, ' ');
-        const valorVisual = nota.valorTexto.padStart(15, ' ');
-        const situacaoVisual = nota.status.substring(0, 18).padEnd(18, ' ');
-        const parteVisual = nota.parteNome.substring(0, 80);
+    const nomeArquivo = `Relatorio-NFSe-${sanitizarNomeArquivo(pasta)}-${new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-')}.txt`;
 
-        conteudo += `${nota.dataEvento.padEnd(12)}| ${idVisual}| ${valorVisual} | ${situacaoVisual}| ${parteVisual}\n`;
-      });
-    }
-    conteudo += `${'-'.repeat(150)}\n\n`;
-
-    // --- BLOCO: NOTAS CANCELADAS / REJEITADAS ---
-    if (notasCanceladas.length > 0) {
-      conteudo += `>>> NOTAS CANCELADAS / REJEITADAS / SUBSTITUÍDAS (${notasCanceladas.length})\n\n`;
-      conteudo += headerTabela;
-      
-      notasCanceladas.forEach(nota => {
-        const idVisual = nota.id.substring(Math.max(0, nota.id.length - 18)).padEnd(20, ' ');
-        const valorVisual = nota.valorTexto.padStart(15, ' ');
-        const situacaoVisual = nota.status.substring(0, 18).padEnd(18, ' ');
-        const parteVisual = nota.parteNome.substring(0, 80);
-
-        conteudo += `${nota.dataEvento.padEnd(12)}| ${idVisual}| ${valorVisual} | ${situacaoVisual}| ${parteVisual}\n`;
-      });
-      conteudo += `${'-'.repeat(150)}\n\n`;
-    }
-
-    // --- RESUMO FINANCEIRO ---
-    conteudo += `RESUMO FINANCEIRO:\n${'-'.repeat(150)}\n`;
-    conteudo += `Total Geral de Notas: ${listaNotas.length}\n`;
-    conteudo += `Notas Válidas: ${notasValidas.length}\n`;
-    conteudo += `Notas Canceladas/Rejeitadas: ${notasCanceladas.length}\n\n`;
-    
-    conteudo += `SOMA DAS NOTAS VÁLIDAS: R$ ${totalValido.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n`;
-    if (notasCanceladas.length > 0) {
-      conteudo += `SOMA DAS NOTAS CANCELADAS: R$ ${totalCancelado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n`;
-    }
-
-    const blob = new Blob([conteudo], { type: 'text/plain;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = window.URL.createObjectURL(blob);
-    a.download = `Relatorio-NFSe-${sanitizarNomeArquivo(pasta)}-${new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-')}.txt`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    // Aciona a mesma API do Chrome via background.js enviando a String Base64 como URL
+    chrome.runtime.sendMessage({ 
+        type: 'downloadXmlSeguro', 
+        payload: {
+            url: dataUrl,
+            folderName: pasta, // Passamos a pasta raiz exata para alinhar com os PDFs/XMLs
+            filename: nomeArquivo
+        } 
+    });
   }
 
   main();
