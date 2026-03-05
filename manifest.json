@@ -5,7 +5,6 @@
   "description": "Emissão automatizada e exportação em massa (XML/PDF e Relatório) do Emissor Nacional NFS-e.",
   "permissions": [
     "storage",
-    "scripting",
     "activeTab",
     "tabs",
     "downloads"
@@ -42,6 +41,12 @@
         "https://www.nfse.gov.br/EmissorNacional/Notas/Recebidas*"
       ],
       "js": ["coletor.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.nfse.gov.br/EmissorNacional/*"],
+      "js": ["bridge.js"],
+      "world": "MAIN",
       "run_at": "document_idle"
     }
   ],

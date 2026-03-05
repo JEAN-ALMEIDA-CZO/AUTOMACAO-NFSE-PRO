@@ -1,5 +1,5 @@
 /**
-* content.js
+ * content.js
  */
 
 // ─── TRATAMENTO DE EXCEÇÕES PERSONALIZADAS (REGRA CRÍTICA) ────────
@@ -863,12 +863,24 @@ async function injectSetupBanner() {
             }
         });
     } else {
-        document.getElementById('nfse-btn-gerador').addEventListener('click', () => {
+        
+        // CORREÇÃO DO POPUP BLOCKER: Delegação segura para o Background
+        document.getElementById('nfse-btn-gerador').addEventListener('click', (e) => {
+            e.preventDefault();
             if (!isExtValid()) {
                 alert("⚠️ A extensão foi atualizada em segundo plano. A página será recarregada para aplicar as alterações.");
                 return window.location.reload();
             }
-            window.open(chrome.runtime.getURL('gerador.html'), '_blank');
+            
+            // Abordagem Correta de Arquitetura: Delega a abertura para o Service Worker (Background)
+            // Isso previne 100% o erro ERR_BLOCKED_BY_CLIENT gerado pelas políticas do Chrome.
+            chrome.runtime.sendMessage({ action: 'ABRIR_PAGINA_GERADOR' }, (response) => {
+                if (chrome.runtime.lastError) {
+                    // Failsafe absoluto caso o background.js falhe na interceptação
+                    console.warn("[AUTOMAÇÃO NFSE] Tentando fallback nativo...");
+                    window.open(chrome.runtime.getURL('gerador.html'), '_blank');
+                }
+            });
         });
 
         document.getElementById('nfse-btn-template').addEventListener('click', () => {

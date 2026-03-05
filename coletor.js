@@ -1,6 +1,22 @@
 if (!window.baixadorXmlV4Iniciado) {
   window.baixadorXmlV4Iniciado = true;
 
+  // --- EXCEÇÕES PERSONALIZADAS & LOGGING ---
+  class ColetorNFSeException extends Error {
+    constructor(mensagem, payload = {}) {
+      super(mensagem);
+      this.name = "ColetorNFSeException";
+      this.payload = payload;
+      this.timestamp = new Date().toISOString();
+    }
+    
+    logarCirurgico() {
+      console.error(`[${this.timestamp}] [${this.name}] ${this.message}`);
+      console.error("Payload/Contexto:", JSON.stringify(this.payload, null, 2));
+      console.error("Stack Trace:", this.stack);
+    }
+  }
+
   // --- CONFIGURAÇÕES GERAIS ---
   const CONFIG = {
     seletorTabela: 'tbody > tr',
@@ -49,7 +65,7 @@ if (!window.baixadorXmlV4Iniciado) {
         console.log(`[AUTOMAÇÃO NFSE] ✅ Dados carregados. Total de linhas na página: ${linhasTabela.length}`);
         
         if (estadoColeta === 'ativo') {
-          const paginaAtual = parseInt(localStorage.getItem(CONFIG.storageKeyPaginaAtual) || '1');
+          const paginaAtual = parseInt(localStorage.getItem(CONFIG.storageKeyPaginaAtual) || '1', 10);
           console.log(`[AUTOMAÇÃO NFSE] 🔄 Continuando coleta automática - Página ${paginaAtual}`);
           continuarColetaAutomatica(headerPerfil);
         } else {
@@ -60,27 +76,142 @@ if (!window.baixadorXmlV4Iniciado) {
     }, CONFIG.intervaloMs);
   }
 
+  // --- COMPONENTES DE INTERFACE (MODAL E TOAST) ---
+
+  function mostrarToast(mensagem, tipo = 'success', tempo = 3000) {
+    const toastsAntigos = document.querySelectorAll('.nfse-modern-toast');
+    toastsAntigos.forEach(t => t.remove());
+
+    const toast = document.createElement('div');
+    toast.className = 'nfse-modern-toast';
+    
+    let corBorda = '#10b981'; // Sucesso (Verde)
+    let icone = '✅';
+    if (tipo === 'info') { corBorda = '#3b82f6'; icone = 'ℹ️'; }
+    if (tipo === 'error') { corBorda = '#ef4444'; icone = '❌'; }
+
+    Object.assign(toast.style, {
+      position: 'fixed',
+      bottom: '30px',
+      right: '30px',
+      backgroundColor: '#ffffff',
+      color: '#334155',
+      padding: '16px 24px',
+      borderRadius: '8px',
+      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+      borderLeft: `5px solid ${corBorda}`,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      fontFamily: "'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+      fontSize: '14px',
+      fontWeight: '600',
+      zIndex: '2147483647',
+      transform: 'translateX(150%)',
+      transition: 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+    });
+
+    toast.innerHTML = `<span style="font-size: 20px;">${icone}</span> <span>${mensagem}</span>`;
+    document.body.appendChild(toast);
+
+    // Trigger de reflow forçado para garantir a transição via CSS
+    void toast.offsetWidth;
+    toast.style.transform = 'translateX(0)';
+
+    setTimeout(() => {
+      toast.style.transform = 'translateX(150%)';
+      setTimeout(() => {
+          if (toast.parentNode) toast.remove();
+      }, 400); // Exclui do DOM após término da animação
+    }, tempo);
+  }
+
+  function mostrarModalCustomizado(titulo, mensagem, tipo = 'alert', isDestrutivo = false) {
+    return new Promise((resolve) => {
+        const modalExistente = document.getElementById('nfse-modal-beautiful');
+        if (modalExistente) modalExistente.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'nfse-modal-beautiful';
+        Object.assign(overlay.style, {
+            position: 'fixed', top: '0', left: '0', width: '100%', height: '100%',
+            backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)',
+            zIndex: '2147483647', display: 'flex', justifyContent: 'center', alignItems: 'center',
+            fontFamily: "'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+            opacity: '0', transition: 'opacity 0.2s ease-in-out'
+        });
+
+        const corBotaoConfirma = isDestrutivo ? '#E52207' : '#1351B4';
+        const corBotaoConfirmaHover = isDestrutivo ? '#C51C05' : '#0C326F';
+        
+        const conteudoFormatado = mensagem.replace(/\n/g, '<br>');
+        const isConfirm = tipo === 'confirm';
+
+        overlay.innerHTML = `
+            <div style="background: #ffffff; border-radius: 16px; width: 90%; max-width: 500px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden; transform: scale(0.95); transition: transform 0.2s ease-in-out;">
+                <div style="padding: 24px;">
+                    <h3 style="margin: 0 0 12px 0; font-size: 20px; font-weight: 700; color: #0f172a;">${titulo}</h3>
+                    <div style="font-size: 15px; color: #475569; line-height: 1.6;">${conteudoFormatado}</div>
+                </div>
+                <div style="background: #f8fafc; padding: 16px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 12px;">
+                    ${isConfirm ? `<button id="nfse-modal-btn-cancel" style="background: #e2e8f0; color: #475569; border: none; padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s;">Cancelar</button>` : ''}
+                    <button id="nfse-modal-btn-ok" style="background: ${corBotaoConfirma}; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s;">${isConfirm ? 'Confirmar' : 'Entendi'}</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        // Dispara animação de entrada
+        setTimeout(() => {
+            overlay.style.opacity = '1';
+            overlay.firstElementChild.style.transform = 'scale(1)';
+        }, 10);
+
+        const fecharModal = (resultado) => {
+            overlay.style.opacity = '0';
+            overlay.firstElementChild.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                overlay.remove();
+                resolve(resultado);
+            }, 200);
+        };
+
+        const btnOk = document.getElementById('nfse-modal-btn-ok');
+        btnOk.onmouseover = () => btnOk.style.background = corBotaoConfirmaHover;
+        btnOk.onmouseout = () => btnOk.style.background = corBotaoConfirma;
+        btnOk.onclick = () => fecharModal(true);
+
+        if (isConfirm) {
+            const btnCancel = document.getElementById('nfse-modal-btn-cancel');
+            btnCancel.onmouseover = () => btnCancel.style.background = '#cbd5e1';
+            btnCancel.onmouseout = () => btnCancel.style.background = '#e2e8f0';
+            btnCancel.onclick = () => fecharModal(false);
+        }
+    });
+  }
+
   // --- LÓGICA DE COLETA AUTOMÁTICA (PAGINAÇÃO) ---
 
-  function iniciarColetaGlobal(headerElement) {
+  async function iniciarColetaGlobal(headerElement) {
     const totalRegistros = obterTotalRegistros();
     const totalPaginas = obterTotalPaginasReal();
     
-    let mensagemConfirmacao = "⚠️ COLETA AUTOMÁTICA DE TODAS AS PÁGINAS\n\n";
+    let mensagemConfirmacao = "⚠️ <strong>COLETA AUTOMÁTICA DE TODAS AS PÁGINAS</strong>\n\n";
     
     if (totalRegistros > 0) {
-      mensagemConfirmacao += `📊 Total de registros detectados: ${totalRegistros}\n`;
-      mensagemConfirmacao += `📄 Total de páginas a percorrer: ${totalPaginas}\n`;
-      mensagemConfirmacao += `⏱️ Tempo estimado: ${Math.ceil(totalPaginas * 2.5)} segundos\n\n`;
+      mensagemConfirmacao += `📊 Total de registros detectados: <strong>${totalRegistros}</strong>\n`;
+      mensagemConfirmacao += `📄 Total de páginas a percorrer: <strong>${totalPaginas}</strong>\n`;
+      mensagemConfirmacao += `⏱️ Tempo estimado: <strong>${Math.ceil(totalPaginas * 2.5)} segundos</strong>\n\n`;
     }
     
-    mensagemConfirmacao += "IMPORTANTE:\n";
+    mensagemConfirmacao += "<strong>IMPORTANTE:</strong>\n";
     mensagemConfirmacao += "✓ NÃO feche esta aba/janela\n";
     mensagemConfirmacao += "✓ NÃO navegue para outras páginas\n";
     mensagemConfirmacao += "✓ Aguarde até a conclusão total\n\n";
     mensagemConfirmacao += "Deseja iniciar a varredura completa?";
     
-    const confirmacao = confirm(mensagemConfirmacao);
+    const confirmacao = await mostrarModalCustomizado("Varredura Automática", mensagemConfirmacao, 'confirm');
     
     if (!confirmacao) {
       console.log("[AUTOMAÇÃO NFSE] ❌ Varredura cancelada pelo usuário");
@@ -107,7 +238,7 @@ if (!window.baixadorXmlV4Iniciado) {
       const textoTotal = descricaoPaginacao.innerText;
       const match = textoTotal.match(/Total de (\d+) registros?/i);
       if (match && match[1]) {
-        return parseInt(match[1]);
+        return parseInt(match[1], 10);
       }
     }
     
@@ -116,7 +247,7 @@ if (!window.baixadorXmlV4Iniciado) {
       const textoTotal = elementoTotal.innerText;
       const match = textoTotal.match(/Total de (\d+) registros?/i);
       if (match && match[1]) {
-        return parseInt(match[1]);
+        return parseInt(match[1], 10);
       }
     }
     
@@ -125,7 +256,7 @@ if (!window.baixadorXmlV4Iniciado) {
       const texto = rodape.innerText;
       const match = texto.match(/de (\d+) registros?/i) || texto.match(/of (\d+) entries/i);
       if (match && match[1]) {
-        return parseInt(match[1]);
+        return parseInt(match[1], 10);
       }
     }
     
@@ -140,7 +271,7 @@ if (!window.baixadorXmlV4Iniciado) {
     if (linkUltima) {
       const href = linkUltima.getAttribute('href');
       const match = href.match(/pg=(\d+)/);
-      if (match && match[1]) return parseInt(match[1]);
+      if (match && match[1]) return parseInt(match[1], 10);
     }
 
     const totalRegistros = obterTotalRegistros();
@@ -153,7 +284,7 @@ if (!window.baixadorXmlV4Iniciado) {
     itens.forEach(item => {
       const texto = item.innerText.trim();
       if (/^\d+$/.test(texto)) {
-        const num = parseInt(texto);
+        const num = parseInt(texto, 10);
         if (num > maiorPagina) maiorPagina = num;
       }
     });
@@ -163,8 +294,8 @@ if (!window.baixadorXmlV4Iniciado) {
   }
 
   function continuarColetaAutomatica(headerElement) {
-    const paginaAtual = parseInt(localStorage.getItem(CONFIG.storageKeyPaginaAtual) || '1');
-    const totalPaginas = parseInt(localStorage.getItem(CONFIG.storageKeyTotalPaginas) || '1');
+    const paginaAtual = parseInt(localStorage.getItem(CONFIG.storageKeyPaginaAtual) || '1', 10);
+    const totalPaginas = parseInt(localStorage.getItem(CONFIG.storageKeyTotalPaginas) || '1', 10);
     
     const novasNotas = extrairNotasDaPagina(headerElement);
     let acumulado = JSON.parse(localStorage.getItem(CONFIG.storageKey) || "[]");
@@ -226,7 +357,7 @@ if (!window.baixadorXmlV4Iniciado) {
     return null;
   }
 
-  function finalizarColetaAutomatica() {
+  async function finalizarColetaAutomatica() {
     localStorage.removeItem(CONFIG.storageKeyEstado);
     localStorage.removeItem(CONFIG.storageKeyPaginaAtual);
     localStorage.removeItem(CONFIG.storageKeyTotalPaginas);
@@ -240,13 +371,14 @@ if (!window.baixadorXmlV4Iniciado) {
       const totalFormatado = somaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       
       let mensagem = "✅ VARREDURA CONCLUÍDA COM SUCESSO!\n\n";
-      mensagem += `📊 Total de notas encontradas: ${todasNotas.length}\n`;
-      mensagem += `💰 Valor total: R$ ${totalFormatado}\n\n`;
-      alert(mensagem);
+      mensagem += `📊 Total de notas processadas: <strong>${todasNotas.length}</strong>\n`;
+      mensagem += `💰 Valor total (Válidas): <strong>R$ ${totalFormatado}</strong>\n\n`;
+      
+      await mostrarModalCustomizado("Varredura Concluída", mensagem, 'alert');
       
       criarInterfaceFlutuante(todasNotas, true);
     } else {
-      alert("⚠️ Nenhuma nota foi encontrada durante a varredura.");
+      await mostrarModalCustomizado("Aviso", "⚠️ Nenhuma nota foi encontrada durante a varredura.", 'alert');
     }
   }
 
@@ -343,16 +475,24 @@ if (!window.baixadorXmlV4Iniciado) {
         }
       }
     } catch (e) {
-        console.error("[AUTOMAÇÃO NFSE] Erro ao extrair dados do perfil", e);
+        const exception = new ColetorNFSeException("Erro ao extrair dados do perfil", { elemento: headerElement?.innerHTML });
+        exception.logarCirurgico();
     }
     return { nomeTitular, docTitular };
   }
 
-  function obterDataMesAnterior() {
+  function obterCompetenciaAtual() {
+    // Fonte da Verdade: O campo de data exibido no formulário do Governo
+    const inputInicio = document.getElementById('datainicio');
+    if (inputInicio && inputInicio.value) { // Ex: "01/02/2026"
+      const partes = inputInicio.value.split('/');
+      if (partes.length === 3) {
+        return `${partes[1]}-${partes[2]}`; // Ex: "02-2026"
+      }
+    }
+    // Fallback caso não encontre (nunca deve ocorrer em fluxo normal)
     const hoje = new Date();
-    const dataPassada = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
-    const mes = String(dataPassada.getMonth() + 1).padStart(2, '0');
-    return `${mes}-${dataPassada.getFullYear()}`;
+    return `${String(hoje.getMonth() + 1).padStart(2, '0')}-${hoje.getFullYear()}`;
   }
 
   function encontrarIdNotaNaLinha(elementoLinha) {
@@ -364,6 +504,34 @@ if (!window.baixadorXmlV4Iniciado) {
     if (linkXml) return linkXml.href.split('/').pop();
     
     return null;
+  }
+  
+  function extrairNumeroNota(chave) {
+    if (!chave) return "N/A";
+    try {
+      // Remove caracteres não numéricos para garantir uma análise segura
+      const limpa = chave.replace(/\D/g, '');
+      
+      // Padrão Nacional NFS-e: A chave de acesso oficial possui exatas 50 posições.
+      // O número da nota fiscal está fixado entre as posições 23 e 36 (índices 23 a 36)
+      if (limpa.length === 50) {
+        const numCortado = limpa.substring(23, 36);
+        return parseInt(numCortado, 10).toString();
+      }
+      
+      // Fallback Estrutural para chaves de outros tamanhos (se for o caso em sistemas híbridos):
+      // Busca o preenchimento de zeros e extrai os dígitos estritamente antes dos últimos 14 caracteres de verificação
+      const matchRegex = limpa.match(/0{3,}(\d+?)(?=\d{14}$)/);
+      if (matchRegex && matchRegex[1]) {
+        return parseInt(matchRegex[1], 10).toString();
+      }
+      
+      return limpa;
+    } catch (e) {
+      const exception = new ColetorNFSeException("Erro na extração dinâmica do número da nota pela Chave.", { chaveFornecida: chave });
+      exception.logarCirurgico();
+      return chave;
+    }
   }
 
   function limparValorMonetario(texto) {
@@ -405,168 +573,191 @@ if (!window.baixadorXmlV4Iniciado) {
         }
       }
     } catch (e) {
-        console.error("[AUTOMAÇÃO NFSE] Erro ao extrair Tomador", e);
+        const exception = new ColetorNFSeException("Erro ao extrair dados do Tomador.", { htmlLinha: linha.innerHTML });
+        exception.logarCirurgico();
     }
     if (!nomeTomador || nomeTomador === "") nomeTomador = "Tomador Nao Identificado";
     return { nomeTomador, docTomador };
   }
 
   function processarNotasEmitidas(perfil) {
-    const dataMesAnterior = obterDataMesAnterior();
-    const pastaRaiz = `${perfil.nomeTitular} - ${perfil.docTitular} - ${dataMesAnterior}`;
+    const dataCompetencia = obterCompetenciaAtual();
+    const pastaRaiz = `${perfil.nomeTitular} - ${perfil.docTitular} - ${dataCompetencia}`;
     const linhas = document.querySelectorAll(CONFIG.seletorTabela);
     const notas = [];
 
     linhas.forEach((linha) => {
-      let idNota = encontrarIdNotaNaLinha(linha);
-      if (idNota) {
-        idNota = idNota.trim();
-        let dataEmissao = "N/A";
-        const celulaData = linha.querySelector('td.td-data');
-        if (celulaData) dataEmissao = celulaData.innerText.trim().split('\n')[0];
+      try {
+        let idNota = encontrarIdNotaNaLinha(linha);
+        if (idNota) {
+          idNota = idNota.trim();
+          let dataEmissao = "N/A";
+          const celulaData = linha.querySelector('td.td-data');
+          if (celulaData) dataEmissao = celulaData.innerText.trim().split('\n')[0];
 
-        // Lendo da Fonte da Verdade (Data Attributes) para identificar o Status
-        const sitDataAtrib = linha.getAttribute('data-situacao') || '';
-        let statusNota = "Emitida";
-        
-        if (sitDataAtrib.includes('CANCELADA')) {
-            statusNota = "NFS-e Cancelada";
-        } else if (sitDataAtrib.includes('SUBSTITUIDA')) {
-            statusNota = "NFS-e Substituída";
-        } else {
-            // Fallback visual
-            const celulaSituacao = linha.querySelector('td.td-situacao');
-            if (celulaSituacao) {
-              const imgStatus = celulaSituacao.querySelector('img');
-              if (imgStatus) {
-                  statusNota = imgStatus.getAttribute('data-original-title') || imgStatus.getAttribute('title') || "Emitida";
-              } else {
-                  statusNota = celulaSituacao.innerText.trim() || "Emitida";
+          // Lendo da Fonte da Verdade (Data Attributes) para identificar o Status
+          const sitDataAtrib = linha.getAttribute('data-situacao') || '';
+          let statusNota = "Emitida";
+          
+          if (sitDataAtrib.includes('CANCELADA')) {
+              statusNota = "NFS-e Cancelada";
+          } else if (sitDataAtrib.includes('SUBSTITUIDA')) {
+              statusNota = "NFS-e Substituída";
+          } else {
+              // Fallback visual
+              const celulaSituacao = linha.querySelector('td.td-situacao');
+              if (celulaSituacao) {
+                const imgStatus = celulaSituacao.querySelector('img');
+                if (imgStatus) {
+                    statusNota = imgStatus.getAttribute('data-original-title') || imgStatus.getAttribute('title') || "Emitida";
+                } else {
+                    statusNota = celulaSituacao.innerText.trim() || "Emitida";
+                }
               }
-            }
+          }
+
+          let valorTexto = "0,00";
+          let valorOriginalFloat = 0.0;
+          let valorFloat = 0.0;
+          
+          // Pegando o Valor cru nativo do Governo para garantir cálculo limpo
+          const valDataAtrib = linha.getAttribute('data-valor');
+          if (valDataAtrib) {
+              valorOriginalFloat = parseFloat(valDataAtrib.replace(',', '.'));
+              valorTexto = valorOriginalFloat.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          } else {
+              // Fallback visual
+              const celulaValor = linha.querySelector('td.td-valor');
+              if (celulaValor) {
+                valorTexto = celulaValor.innerText.trim();
+                valorOriginalFloat = limparValorMonetario(valorTexto);
+              }
+          }
+
+          valorFloat = valorOriginalFloat;
+          const statusLower = statusNota.toLowerCase();
+          // Condição Crítica de Negócio: Zera o montante válido se a nota estiver morta contabilmente
+          if (statusLower.includes('cancelada') || statusLower.includes('substituida') || statusLower.includes('substituída') || statusLower.includes('rejeitada')) {
+              valorFloat = 0.0;
+          }
+
+          const dadosTomador = extrairTomadorDaLinha(linha);
+          const numeroNotaReal = extrairNumeroNota(idNota);
+
+          notas.push({
+            id: idNota,
+            numeroNota: numeroNotaReal,
+            urlXml: `${CONFIG.urlBaseXml}${idNota}`,
+            urlPdf: `${CONFIG.urlBasePdf}${idNota}`,
+            pastaRaiz: pastaRaiz,
+            dataEvento: dataEmissao,
+            valorTexto: valorTexto,
+            valorOriginalFloat: valorOriginalFloat, // Mantém o backup para relatório discriminado
+            valorFloat: valorFloat, // Usado no cálculo Válido
+            parteNome: dadosTomador.nomeTomador,
+            parteDoc: dadosTomador.docTomador,
+            status: statusNota,
+            tipo: 'EMITIDA'
+          });
         }
-
-        let valorTexto = "0,00";
-        let valorFloat = 0.0;
-        
-        // Pegando o Valor cru nativo do Governo para garantir calculo limpo
-        const valDataAtrib = linha.getAttribute('data-valor');
-        if (valDataAtrib) {
-            valorFloat = parseFloat(valDataAtrib.replace(',', '.'));
-            valorTexto = valorFloat.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        } else {
-            // Fallback visual
-            const celulaValor = linha.querySelector('td.td-valor');
-            if (celulaValor) {
-              valorTexto = celulaValor.innerText.trim();
-              valorFloat = limparValorMonetario(valorTexto);
-            }
-        }
-
-        // Se a nota estiver cancelada, não importa qual era o valor bruto de emissão, no balanço é 0.
-        const statusLower = statusNota.toLowerCase();
-        if (statusLower.includes('cancelada') || statusLower.includes('substituida') || statusLower.includes('rejeitada')) {
-            valorFloat = 0.0;
-        }
-
-        const dadosTomador = extrairTomadorDaLinha(linha);
-
-        notas.push({
-          id: idNota,
-          urlXml: `${CONFIG.urlBaseXml}${idNota}`,
-          urlPdf: `${CONFIG.urlBasePdf}${idNota}`,
-          pastaRaiz: pastaRaiz,
-          dataEvento: dataEmissao,
-          valorTexto: valorTexto,
-          valorFloat: valorFloat,
-          parteNome: dadosTomador.nomeTomador,
-          parteDoc: dadosTomador.docTomador,
-          status: statusNota,
-          tipo: 'EMITIDA'
-        });
+      } catch (e) {
+        const exception = new ColetorNFSeException("Falha crítica no processamento de uma linha de Nota Emitida.", { htmlLinha: linha.innerHTML });
+        exception.logarCirurgico();
       }
     });
     return notas;
   }
 
   function processarNotasRecebidas(perfil) {
-    const dataMesAnterior = obterDataMesAnterior();
+    const dataCompetencia = obterCompetenciaAtual();
     const nomePerfilLimpo = sanitizarNomeArquivo(perfil.nomeTitular);
-    const pastaRaiz = `${nomePerfilLimpo} - Recebidas - ${dataMesAnterior}`;
+    const pastaRaiz = `${nomePerfilLimpo} - Recebidas - ${dataCompetencia}`;
     const linhas = document.querySelectorAll(CONFIG.seletorTabela);
     const notas = [];
 
     linhas.forEach((linha) => {
-      const cols = linha.querySelectorAll('td');
-      if (cols.length < 5) return;
+      try {
+        const cols = linha.querySelectorAll('td');
+        if (cols.length < 5) return;
 
-      const idNotaRaw = encontrarIdNotaNaLinha(linha);
-      if (!idNotaRaw) return;
-      const idNota = idNotaRaw.trim();
+        const idNotaRaw = encontrarIdNotaNaLinha(linha);
+        if (!idNotaRaw) return;
+        const idNota = idNotaRaw.trim();
 
-      let nomePrestador = "Desconhecido";
-      let docPrestador = "";
-      const textoPrestador = cols[1].innerText.trim();
-      
-      const matchCnpj = textoPrestador.match(/(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})|(\d{3}\.\d{3}\.\d{3}-\d{2})/);
-      if (matchCnpj) {
-        docPrestador = matchCnpj[0];
-        nomePrestador = textoPrestador.replace(docPrestador, '').replace(/^[P\-\s]+/, '').trim();
-      } else {
-        nomePrestador = textoPrestador;
+        let nomePrestador = "Desconhecido";
+        let docPrestador = "";
+        const textoPrestador = cols[1].innerText.trim();
+        
+        const matchCnpj = textoPrestador.match(/(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})|(\d{3}\.\d{3}\.\d{3}-\d{2})/);
+        if (matchCnpj) {
+          docPrestador = matchCnpj[0];
+          nomePrestador = textoPrestador.replace(docPrestador, '').replace(/^[P\-\s]+/, '').trim();
+        } else {
+          nomePrestador = textoPrestador;
+        }
+
+        const dataGeracao = cols[0].innerText.trim().split(' ')[0];
+        
+        // Validação segura da Situação
+        const sitDataAtrib = linha.getAttribute('data-situacao') || '';
+        let statusNota = "Recebida";
+        
+        if (sitDataAtrib.includes('CANCELADA')) {
+            statusNota = "NFS-e Cancelada";
+        } else if (sitDataAtrib.includes('SUBSTITUIDA')) {
+            statusNota = "NFS-e Substituída";
+        } else if (sitDataAtrib.includes('REJEITADA')) {
+            statusNota = "NFS-e Rejeitada";
+        } else {
+            const imgStatus = cols[4] ? cols[4].querySelector('img') : null;
+            if (imgStatus) {
+                statusNota = imgStatus.getAttribute('data-original-title') || imgStatus.getAttribute('title') || "Recebida";
+            }
+        }
+
+        // Extração rigorosa de valor Double-Tracking
+        let valorTexto = "0,00";
+        let valorOriginalFloat = 0.0;
+        let valorFloat = 0.0;
+        const valDataAtrib = linha.getAttribute('data-valor');
+        
+        if (valDataAtrib) {
+            valorOriginalFloat = parseFloat(valDataAtrib.replace(',', '.'));
+            valorTexto = valorOriginalFloat.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        } else {
+            valorTexto = cols[3] ? cols[3].innerText.trim() : "0,00";
+            valorOriginalFloat = limparValorMonetario(valorTexto);
+        }
+
+        valorFloat = valorOriginalFloat;
+        const statusLower = statusNota.toLowerCase();
+        
+        // Zero Notas Recebidas e Canceladas na Origem
+        if (statusLower.includes('cancelada') || statusLower.includes('substituida') || statusLower.includes('substituída') || statusLower.includes('rejeitada')) {
+            valorFloat = 0.0;
+        }
+        
+        const numeroNotaReal = extrairNumeroNota(idNota);
+
+        notas.push({
+          id: idNota,
+          numeroNota: numeroNotaReal,
+          urlXml: `${CONFIG.urlBaseXml}${idNota}`,
+          urlPdf: `${CONFIG.urlBasePdf}${idNota}`,
+          pastaRaiz: pastaRaiz,
+          dataEvento: dataGeracao,
+          valorTexto: valorTexto,
+          valorOriginalFloat: valorOriginalFloat, // Histórico de Canceladas
+          valorFloat: valorFloat, // Processado Válido
+          parteNome: nomePrestador,
+          parteDoc: docPrestador,
+          status: statusNota,
+          tipo: 'RECEBIDA'
+        });
+      } catch (e) {
+        const exception = new ColetorNFSeException("Falha crítica no processamento de uma linha de Nota Recebida.", { htmlLinha: linha.innerHTML });
+        exception.logarCirurgico();
       }
-
-      const dataGeracao = cols[0].innerText.trim().split(' ')[0];
-      
-      // Validacao segura da Situacao
-      const sitDataAtrib = linha.getAttribute('data-situacao') || '';
-      let statusNota = "Recebida";
-      
-      if (sitDataAtrib.includes('CANCELADA')) {
-          statusNota = "NFS-e Cancelada";
-      } else if (sitDataAtrib.includes('SUBSTITUIDA')) {
-          statusNota = "NFS-e Substituída";
-      } else if (sitDataAtrib.includes('REJEITADA')) {
-          statusNota = "NFS-e Rejeitada";
-      } else {
-          const imgStatus = cols[4] ? cols[4].querySelector('img') : null;
-          if (imgStatus) {
-              statusNota = imgStatus.getAttribute('data-original-title') || imgStatus.getAttribute('title') || "Recebida";
-          }
-      }
-
-      // Extração rigorosa de valor
-      let valorTexto = "0,00";
-      let valorFloat = 0.0;
-      const valDataAtrib = linha.getAttribute('data-valor');
-      
-      if (valDataAtrib) {
-          valorFloat = parseFloat(valDataAtrib.replace(',', '.'));
-          valorTexto = valorFloat.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      } else {
-          valorTexto = cols[3] ? cols[3].innerText.trim() : "0,00";
-          valorFloat = limparValorMonetario(valorTexto);
-      }
-
-      // Zero Notas Recebidas e Canceladas na Origem
-      const statusLower = statusNota.toLowerCase();
-      if (statusLower.includes('cancelada') || statusLower.includes('substituida') || statusLower.includes('rejeitada')) {
-          valorFloat = 0.0;
-      }
-
-      notas.push({
-        id: idNota,
-        urlXml: `${CONFIG.urlBaseXml}${idNota}`,
-        urlPdf: `${CONFIG.urlBasePdf}${idNota}`,
-        pastaRaiz: pastaRaiz,
-        dataEvento: dataGeracao,
-        valorTexto: valorTexto,
-        valorFloat: valorFloat,
-        parteNome: nomePrestador,
-        parteDoc: docPrestador,
-        status: statusNota,
-        tipo: 'RECEBIDA'
-      });
     });
     return notas;
   }
@@ -616,15 +807,29 @@ if (!window.baixadorXmlV4Iniciado) {
     const selectMes = document.createElement('select');
     estilizarSelect(selectMes);
     
-    const anoAtual = new Date().getFullYear();
     const mesesNomes = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
     
+    // Leitura Dinâmica do DOM para manter o select fiel ao que o usuário buscou
+    let mesVisualizado = new Date().getMonth() + 1;
+    let anoVisualizado = new Date().getFullYear();
+    
+    const inputInicioDOM = document.getElementById('datainicio');
+    if (inputInicioDOM && inputInicioDOM.value) {
+        const partes = inputInicioDOM.value.split('/');
+        if (partes.length === 3) {
+            mesVisualizado = parseInt(partes[1], 10);
+            anoVisualizado = parseInt(partes[2], 10);
+        }
+    }
+    
+    const nomeMesAtualDisplay = mesesNomes[mesVisualizado - 1] || "Competência";
+
     mesesNomes.forEach((nome, i) => {
-        adicionarOpcao(selectMes, i + 1, `${nome}/${anoAtual}`);
+        adicionarOpcao(selectMes, i + 1, `${nome}/${anoVisualizado}`);
     });
     
-    // Pre-seleciona o mês atual
-    selectMes.value = new Date().getMonth() + 1;
+    // Trava o select na competência lida do DOM
+    selectMes.value = mesVisualizado;
 
     const btnConsultar = document.createElement('button');
     btnConsultar.innerHTML = '🔍 Buscar';
@@ -634,10 +839,10 @@ if (!window.baixadorXmlV4Iniciado) {
     btnConsultar.onmouseover = () => btnConsultar.style.backgroundColor = '#0C326F';
     btnConsultar.onmouseout = () => btnConsultar.style.backgroundColor = '#1351B4';
 
-    btnConsultar.addEventListener('click', () => {
-        const mes = parseInt(selectMes.value);
+    btnConsultar.addEventListener('click', async () => {
+        const mes = parseInt(selectMes.value, 10);
         // Calcula dinamicamente o último dia do mês selecionado
-        const ultimoDia = new Date(anoAtual, mes, 0).getDate();
+        const ultimoDia = new Date(anoVisualizado, mes, 0).getDate();
         const mesFormatado = String(mes).padStart(2, '0');
         
         const inputInicio = document.getElementById('datainicio');
@@ -647,18 +852,18 @@ if (!window.baixadorXmlV4Iniciado) {
         
         if (inputInicio && inputFim && btnSubmit) {
             // Preenche e dispara eventos para ativar a detecção de mudança do site Gov
-            inputInicio.value = `01/${mesFormatado}/${anoAtual}`;
+            inputInicio.value = `01/${mesFormatado}/${anoVisualizado}`;
             inputInicio.dispatchEvent(new Event('input', { bubbles: true }));
             inputInicio.dispatchEvent(new Event('change', { bubbles: true }));
             
-            inputFim.value = `${ultimoDia}/${mesFormatado}/${anoAtual}`;
+            inputFim.value = `${ultimoDia}/${mesFormatado}/${anoVisualizado}`;
             inputFim.dispatchEvent(new Event('input', { bubbles: true }));
             inputFim.dispatchEvent(new Event('change', { bubbles: true }));
             
             // Pausa sutil antes de clicar para renderização do DOM
             setTimeout(() => btnSubmit.click(), 200);
         } else {
-            alert('⚠️ Campos de data ou botão de busca não encontrados nesta tela.');
+            await mostrarModalCustomizado("Erro de Interface", "⚠️ Campos de data ou botão de busca não encontrados nesta tela.", 'alert');
         }
     });
 
@@ -698,10 +903,14 @@ if (!window.baixadorXmlV4Iniciado) {
             btnBaixar.style.backgroundColor = '#94a3b8';
             btnBaixar.style.cursor = 'not-allowed';
         } else {
-            let somaTotalVisual = 0;
-            listaNotas.forEach(n => somaTotalVisual += n.valorFloat);
+            let somaTotalValida = 0;
+            listaNotas.forEach(n => somaTotalValida += n.valorFloat);
             
-            spanTexto.textContent = isModoGlobal ? `${acao} (${listaNotas.length} Notas)` : `${acao} da Página (${listaNotas.length} | R$ ${somaTotalVisual.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
+            // Injeção do Nome do Mês dinâmico no Botão de Download para comprovar a visualização
+            spanTexto.textContent = isModoGlobal 
+                ? `${acao} de ${nomeMesAtualDisplay} (${listaNotas.length} Notas)` 
+                : `${acao} de ${nomeMesAtualDisplay} (${listaNotas.length} | Válido R$ ${somaTotalValida.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
+            
             btnBaixar.disabled = false;
             btnBaixar.style.backgroundColor = '#138E2C';
             btnBaixar.style.cursor = 'pointer';
@@ -763,8 +972,14 @@ if (!window.baixadorXmlV4Iniciado) {
       });
       btnFechar.onmouseover = () => { btnFechar.style.background = '#E52207'; btnFechar.style.color = '#fff'; };
       btnFechar.onmouseout = () => { btnFechar.style.background = 'transparent'; btnFechar.style.color = '#E52207'; };
-      btnFechar.onclick = () => {
-        if (confirm("Deseja realmente fechar e limpar os dados coletados?")) {
+      btnFechar.onclick = async () => {
+        const confirmou = await mostrarModalCustomizado(
+            "Encerrar Varredura", 
+            "Deseja realmente fechar a interface global e limpar os dados coletados temporariamente?", 
+            'confirm', 
+            true // isDestrutivo = true (Botão Vermelho)
+        );
+        if (confirmou) {
           container.remove();
           localStorage.removeItem(CONFIG.storageKey);
         }
@@ -817,8 +1032,34 @@ if (!window.baixadorXmlV4Iniciado) {
     const fila = listaNotas.map(nota => {
       const ext = tipoArquivo === 'xml' ? '.xml' : '.pdf';
       const url = tipoArquivo === 'xml' ? nota.urlXml : nota.urlPdf;
-      const nomeParteSeguro = sanitizarNomeArquivo(nota.parteNome).substring(0, 30);
-      return { url: url, folderName: `${nota.pastaRaiz}/${tipoArquivo}`, filename: `NFSe-${nota.id}-${nomeParteSeguro}${ext}` };
+      
+      // Nova formatação do nome do arquivo padronizado (Snake Case Uppercase)
+      // Ex: ARTCON EMPREENDIMENTOS LTDA. -> ARTCON_EMPREENDIMENTOS_LTDA
+      let nomeFormatado = sanitizarNomeArquivo(nota.parteNome)
+        .replace(/\./g, '')          // Remove pontos para evitar extensão .ltda.xml
+        .trim()                      // Limpa as bordas
+        .replace(/\s+/g, '_')        // Substitui espaços vazios por underscore
+        .toUpperCase()               // Mantém padronizado em CAIXA ALTA
+        .substring(0, 50)            // Limita a 50 caracteres para segurança do FileSystem
+        .replace(/_+$/, '');         // Garante que o corte não deixe um underscore inútil no final da string
+
+      // Injeção de status condicional: Se a nota foi invalidada, sufixa no nome do arquivo
+      let sufixoStatus = '';
+      const statusNormalizado = nota.status.toLowerCase();
+      
+      if (statusNormalizado.includes('cancelada')) {
+          sufixoStatus = '_CANCELADA';
+      } else if (statusNormalizado.includes('substituida') || statusNormalizado.includes('substituída')) {
+          sufixoStatus = '_SUBSTITUIDA';
+      } else if (statusNormalizado.includes('rejeitada')) {
+          sufixoStatus = '_REJEITADA';
+      }
+
+      return { 
+        url: url, 
+        folderName: `${nota.pastaRaiz}/${tipoArquivo}`, 
+        filename: `NFSE_${nota.numeroNota}_${nomeFormatado}${sufixoStatus}${ext}` 
+      };
     });
 
     if (fila.length === 0) return;
@@ -838,6 +1079,7 @@ if (!window.baixadorXmlV4Iniciado) {
           btn.style.backgroundColor = '#94a3b8'; 
           btn.style.boxShadow = 'none';
           spanTexto.textContent = 'Tudo baixado ✓';
+          mostrarToast("Todos os formatos foram exportados com sucesso!", "success");
         } else {
           btn.style.backgroundColor = '#138E2C';
           btn.disabled = false; 
@@ -849,6 +1091,7 @@ if (!window.baixadorXmlV4Iniciado) {
           if (proxima) select.value = proxima.value;
           
           if(callbackTexto) callbackTexto(); 
+          mostrarToast(`Lote de ${tipoArquivo.toUpperCase()} baixado com sucesso!`, "success");
         }
       }, 1500);
     };
@@ -872,39 +1115,70 @@ if (!window.baixadorXmlV4Iniciado) {
 
   function gerarRelatorioTxt(listaNotas) {
     if (!listaNotas || listaNotas.length === 0) return;
-    const pasta = listaNotas[0].pastaRaiz;
-    const isRecebida = listaNotas[0].tipo === 'RECEBIDA';
-    const tipoRelatorio = isRecebida ? "NOTAS RECEBIDAS (TOMADAS)" : "NOTAS EMITIDAS (PRESTADAS)";
-
-    let conteudo = `RELATÓRIO DE NOTAS FISCAIS - ${tipoRelatorio}\n${'='.repeat(150)}\nPASTA: ${pasta}\nGerado em: ${new Date().toLocaleString('pt-BR')}\nTotal de Notas: ${listaNotas.length}\n${'='.repeat(150)}\n\n`;
     
-    conteudo += `DATA        | ID NOTA             |      VALOR (R$) | SITUAÇÃO          | ${isRecebida ? "PRESTADOR" : "TOMADOR"}\n${'-'.repeat(150)}\n`;
-    
-    let total = 0.0, totalCanceladas = 0;
+    try {
+      const pasta = listaNotas[0].pastaRaiz;
+      const isRecebida = listaNotas[0].tipo === 'RECEBIDA';
+      const tipoRelatorio = isRecebida ? "NOTAS RECEBIDAS (TOMADAS)" : "NOTAS EMITIDAS (PRESTADAS)";
 
-    listaNotas.forEach(nota => {
-      conteudo += `${nota.dataEvento.padEnd(12)}| ${nota.id.substring(nota.id.length - 18).padEnd(20)}| ${nota.valorTexto.padStart(15)} | ${nota.status.substring(0, 18).padEnd(18)}| ${nota.parteNome.substring(0, 50)}\n`;
-      total += nota.valorFloat;
-      if (nota.status.toLowerCase().includes('cancelada') || nota.status.toLowerCase().includes('rejeitada') || nota.status.toLowerCase().includes('substituída')) totalCanceladas++;
-    });
+      let conteudo = `RELATÓRIO DE NOTAS FISCAIS - ${tipoRelatorio}\n${'='.repeat(150)}\nPASTA: ${pasta}\nGerado em: ${new Date().toLocaleString('pt-BR')}\nTotal de Notas Processadas: ${listaNotas.length}\n${'='.repeat(150)}\n\n`;
+      
+      conteudo += `DATA        | NÚMERO DA NOTA       |      VALOR (R$) | SITUAÇÃO          | ${isRecebida ? "PRESTADOR" : "TOMADOR"}\n${'-'.repeat(150)}\n`;
+      
+      let totalEmitidasValidas = 0.0;
+      let totalCanceladasSubstituidas = 0.0;
+      let qtdValidas = 0;
+      let qtdCanceladas = 0;
 
-    conteudo += `${'-'.repeat(150)}\n\nRESUMO FINANCEIRO:\n${'-'.repeat(150)}\nTotal Válidas: ${listaNotas.length - totalCanceladas}\nCanceladas/Substituídas: ${totalCanceladas}\n\nVALOR TOTAL REAL: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n`;
+      listaNotas.forEach(nota => {
+        const isCancelada = nota.status.toLowerCase().includes('cancelada') || 
+                            nota.status.toLowerCase().includes('rejeitada') || 
+                            nota.status.toLowerCase().includes('substituída') || 
+                            nota.status.toLowerCase().includes('substituida');
+        
+        // Exibimos o valor original na linha para manter o histórico, mas o somatório é segregado
+        const valorVisualRow = nota.valorOriginalFloat.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const numNotaLimpo = nota.numeroNota.padEnd(20);
 
-    // Converte o texto para Base64 (Lidando com acentuação via encodeURIComponent para evitar quebra de caracteres)
-    const base64Content = btoa(unescape(encodeURIComponent(conteudo)));
-    const dataUrl = 'data:text/plain;charset=utf-8;base64,' + base64Content;
-    
-    const nomeArquivo = `Relatorio-NFSe-${sanitizarNomeArquivo(pasta)}-${new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-')}.txt`;
+        conteudo += `${nota.dataEvento.padEnd(12)}| ${numNotaLimpo} | ${valorVisualRow.padStart(15)} | ${nota.status.substring(0, 18).padEnd(18)}| ${nota.parteNome.substring(0, 50)}\n`;
+        
+        if (isCancelada) {
+            totalCanceladasSubstituidas += nota.valorOriginalFloat;
+            qtdCanceladas++;
+        } else {
+            totalEmitidasValidas += nota.valorOriginalFloat;
+            qtdValidas++;
+        }
+      });
 
-    // Aciona a mesma API do Chrome via background.js enviando a String Base64 como URL
-    chrome.runtime.sendMessage({ 
-        type: 'downloadXmlSeguro', 
-        payload: {
-            url: dataUrl,
-            folderName: pasta, // Passamos a pasta raiz exata para alinhar com os PDFs/XMLs
-            filename: nomeArquivo
-        } 
-    });
+      conteudo += `${'-'.repeat(150)}\n\nRESUMO FINANCEIRO (DISCRIMINADO):\n${'-'.repeat(150)}\n`;
+      conteudo += `-> TOTAL VALOR EMITIDAS/VÁLIDAS: R$ ${totalEmitidasValidas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${qtdValidas} notas)\n`;
+      conteudo += `-> TOTAL VALOR CANCELADAS/SUBSTITUÍDAS: R$ ${totalCanceladasSubstituidas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${qtdCanceladas} notas)\n\n`;
+      conteudo += `* Regra de Negócio: O valor das notas canceladas/substituídas é zerado contabilmente, não integrando o montante das válidas.\n`;
+
+      // Converte o texto para Base64 (Lidando com acentuação via encodeURIComponent para evitar quebra de caracteres)
+      const base64Content = btoa(unescape(encodeURIComponent(conteudo)));
+      const dataUrl = 'data:text/plain;charset=utf-8;base64,' + base64Content;
+      
+      const nomeArquivo = `Relatorio-NFSe-${sanitizarNomeArquivo(pasta)}-${new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-')}.txt`;
+
+      // Aciona a mesma API do Chrome via background.js enviando a String Base64 como URL
+      chrome.runtime.sendMessage({ 
+          type: 'downloadXmlSeguro', 
+          payload: {
+              url: dataUrl,
+              folderName: pasta, // Passamos a pasta raiz exata para alinhar com os PDFs/XMLs
+              filename: nomeArquivo
+          } 
+      });
+      
+      mostrarToast("Relatório de conferência gerado com sucesso!", "info");
+      
+    } catch (e) {
+      const exception = new ColetorNFSeException("Falha crítica ao gerar o Relatório TXT Finalizado.", { qtdeNotas: listaNotas.length });
+      exception.logarCirurgico();
+      mostrarToast("Erro ao tentar gerar o relatório TXT.", "error");
+    }
   }
 
   main();

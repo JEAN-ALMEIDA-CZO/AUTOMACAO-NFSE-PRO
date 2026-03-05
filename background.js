@@ -1,4 +1,22 @@
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  
+  // =========================================================================
+  // ROTA 1: ABERTURA DE PÁGINAS PRIVILEGIADAS (BYPASS DE POPUP BLOCKER)
+  // =========================================================================
+  if (message.action === 'ABRIR_PAGINA_GERADOR') {
+    console.log("[AUTOMAÇÃO NFSE] Solicitação para abrir o Gerador recebida.");
+    
+    chrome.tabs.create({ 
+        url: chrome.runtime.getURL("gerador.html") 
+    });
+    
+    sendResponse({ success: true });
+    return true; // Mantém o canal de comunicação aberto
+  }
+
+  // =========================================================================
+  // ROTA 2: MOTOR DE DOWNLOAD SILENCIOSO E ROTEAMENTO DE PASTAS
+  // =========================================================================
   if (message.type === 'downloadXmlSeguro') {
     const { url, folderName, filename } = message.payload;
 
@@ -28,6 +46,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     });
 
-    return true;
+    sendResponse({ success: true });
+    return true; // Mantém o canal de comunicação aberto para o assincronismo da API de Downloads
   }
 });
